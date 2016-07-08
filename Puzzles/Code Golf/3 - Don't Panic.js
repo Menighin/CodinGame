@@ -1,0 +1,1 @@
+i=readline().split(' ');a=i[3];b=i[4];n=i[7];e={};e[a]=b;for(i=0;i<n;i++){j=readline().split(' ');e[j[0]] = j[1];}while(true){i=readline().split(' ');a=i[0];b=parseInt(i[1]);d=i[2];if((e[a]>b&&d=='LEFT')||(e[a]<b&&d=='RIGHT'))print('BLOCK');else print('WAIT')}
