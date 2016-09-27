@@ -39,8 +39,11 @@ class Game
 
 				if (entityType == (int)EntityType.Player) 
 					players[owner] = new Player(owner, param1, param2, x, y);
-				else {
-					bombs[owner] = new Bomb(owner, param1, param2, x, y);
+				else if (entityType == (int)EntityType.Bomb)
+				{
+					Bomb b = new Bomb(owner, param1, param2, x, y);
+					map.MarkDeadBoxes(b);
+					bombs[owner] = b;
 					map.SetCell(x, y, 'b');
 				}
 
@@ -48,21 +51,30 @@ class Game
             
             // Process map
 			//map.PrintMap();
-
 			int maxScore = 0;
 			int targetX = 0, targetY = 0;
-			for (var i = 0; i < map.Height; i++)
-			{
-				for (var j = 0; j < map.Width; j++) {
 
-					int cellScore = map.CalculateScore(j, i, players[myId].BombRadius);
-					if (cellScore > maxScore) 
-					{
-						targetX = j;
-						targetY = i;
-						maxScore = cellScore;
-					}
+			// Using a BFS search from players position to find the better place he can put the bomb
+			Queue queue = new Queue();
+			queue.Enqueue(new Tuple<int, int>(players[myId].X, players[myId].Y)); // Enqueue the player position
+
+			while (queue.Count > 0) {
+
+				Tuple<int, int> pos = (Tuple<int, int>) queue.Dequeue();
+				int cellScore = map.CalculateScore(pos.Item1, pos.Item2, players[myId].BombRadius);
+				if (cellScore > maxScore) 
+				{
+					targetX = pos.Item1;
+					targetY = pos.Item2;
+					maxScore = cellScore;
 				}
+
+				// Queue next valid positions that hasn't be queued before
+				foreach (var p in map.GetValidAdjacentPositions(pos))
+				{
+					queue.Enqueue(p);
+				}
+
 			}
 			
 			if (players[myId].X == targetX && players[myId].Y == targetY)
@@ -77,16 +89,18 @@ class Game
 	public enum EntityType 
 	{
 		Player,
-		Bomb
+		Bomb,
+		Item
 	};
     
     // Class to define and control the map state
     public class Map 
 	{
-        
         public List<StringBuilder> Grid {get; set;}
+        public int[,] ProcessedGrid {get; set;}
         public int Height {get; set;}
 		public int Width {get; set;}
+		private String _boxesLabels = "012"; 
 
 		public Map(int height, int width) 
 		{
@@ -97,6 +111,11 @@ class Game
         public void ReadMap() 
 		{
             this.Grid = new List<StringBuilder>();
+            this.ProcessedGrid = new int[Height, Width];
+
+			for (var i = 0; i < Height; i++)
+				for (var j = 0; j < Width; j++)
+					this.ProcessedGrid[i, j] = -1;
 
             for (int i = 0; i < this.Height; i++)
             {
@@ -130,41 +149,94 @@ class Game
 		public int CalculateScore (int x, int y, int radius) 
 		{
 			// If can't place a bomb, then it has no score
-			if (Grid[y][x] != '.') return 0;
+			if (Grid[y][x] != '.') {
+                ProcessedGrid[y, x] = 0;
+                return 0;
+            }
 
 			int score = 0;
 			bool checkUp = true, checkDown = true, checkRight = true, checkLeft = true;
-
-			for (var i = 1; i <= radius; i++)
+			
+			for (var i = 1; i < radius; i++)
 			{
 
-				if (checkUp && y - i >= 0 && Grid[y - 1][x] == '0')
+				if (checkUp && y - i >= 0 && _boxesLabels.Contains(Grid[y - i][x]))
 				{
 					score++;
 					checkUp = false;
 				}
 
-				if (checkDown && y + i < this.Height && Grid[y + 1][x] == '0')
+				if (checkDown && y + i < this.Height && _boxesLabels.Contains(Grid[y + i][x]))
 				{
 					score++;
 					checkDown = false;
 				}
 
-				if (checkLeft && x - i >= 0 && Grid[y][x - i] == '0')
+				if (checkLeft && x - i >= 0 && _boxesLabels.Contains(Grid[y][x - i]))
 				{
 					score++;
 					checkLeft = false;
 				}
 
-				if (checkRight && x + i < this.Width && Grid[y][x + i] == '0')
+				if (checkRight && x + i < this.Width && _boxesLabels.Contains(Grid[y][x + i]))
 				{
 					score++;
 					checkRight = false;
 				}
 			}
 
+            ProcessedGrid[y, x] = score;
+
 			return score; 
 
+		}
+
+		public void MarkDeadBoxes(Bomb b)
+		{
+			bool checkUp = true, checkDown = true, checkRight = true, checkLeft = true;
+			for (var i = 0; i < b.BombRadius; i++) {
+				if (checkUp && b.Y - i >= 0 && _boxesLabels.Contains(Grid[b.Y - i][b.X]))
+				{
+					Grid[b.Y - 1][b.X] = '#';
+					checkUp = false;
+				}
+
+				if (checkDown && b.Y + i < this.Height && _boxesLabels.Contains(Grid[b.Y + i][b.X]))
+				{
+					Grid[b.Y + 1][b.X] = '#';
+					checkDown = false;
+				}
+
+				if (checkLeft && b.X - i >= 0 && _boxesLabels.Contains(Grid[b.Y][b.X - i]))
+				{
+					Grid[b.Y][b.X - i] = '#';
+					checkLeft = false;
+				}
+
+				if (checkRight && b.X + i < this.Width && _boxesLabels.Contains(Grid[b.Y][b.X + i]))
+				{
+					Grid[b.Y][b.X + i] = '#';
+					checkRight = false;
+				}
+			}
+		}
+
+		public List<Tuple<int, int>> GetValidAdjacentPositions (Tuple<int, int> p)
+		{
+			var list = new List<Tuple<int, int>>();
+			if (p.Item1 - 1 >= 0 && Grid[p.Item2][p.Item1 - 1] == '.' && ProcessedGrid[p.Item2, p.Item1 - 1] == -1)
+				list.Add(new Tuple<int, int>(p.Item1 - 1, p.Item2));
+
+			if (p.Item2 - 1 >= 0 && Grid[p.Item2 - 1][p.Item1] == '.' && ProcessedGrid[p.Item2 - 1, p.Item1] == -1)
+				list.Add(new Tuple<int, int>(p.Item1, p.Item2 - 1));
+
+			if (p.Item1 + 1 < Width && Grid[p.Item2][p.Item1 + 1] == '.' && ProcessedGrid[p.Item2, p.Item1 + 1] == -1)
+				list.Add(new Tuple<int, int>(p.Item1 + 1, p.Item2));
+
+			if (p.Item2 + 1 < Height && Grid[p.Item2 + 1][p.Item1] == '.' && ProcessedGrid[p.Item2 + 1, p.Item1] == -1)
+				list.Add(new Tuple<int, int>(p.Item1, p.Item2 + 1));
+
+			return list;
 		}
     }
 
