@@ -34,8 +34,8 @@ class Game
                 int owner = int.Parse(inputs[1]);
                 int x = int.Parse(inputs[2]);
                 int y = int.Parse(inputs[3]);
-                int param1 = int.Parse(inputs[4]);
-                int param2 = int.Parse(inputs[5]);
+                int param1 = int.Parse(inputs[4]); // RoundsLeft
+                int param2 = int.Parse(inputs[5]); // Range
 
 				if (entityType == (int)EntityType.Player) 
 					players[owner] = new Player(owner, param1, param2, x, y);
@@ -160,7 +160,6 @@ class Game
 			
 			for (var i = 1; i < radius; i++)
 			{
-
 				if (checkUp && y - i >= 0 && Grid[y - i][x] != '.')
 				{
 					if (_boxesLabels.Contains(Grid[y - i][x])) score++;
@@ -186,6 +185,15 @@ class Game
 				}
 			}
 
+			// Make a copy of actual grid state
+			var gridCopy = new List<StringBuilder>(this.Grid.Select(l => new StringBuilder(l.ToString())));
+			
+			// Mark the dangerous paths if the bomb is put in this position
+			this.MarkDangerousPaths(new Bomb(0, 8, radius, x, y), gridCopy);
+
+			if (!this.IsSafeToBombHere(x, y, gridCopy)) // Check wether is safe to put a bomb here
+				score = -1;
+			
             ProcessedGrid[y, x] = score;
 
 			return score; 
@@ -223,34 +231,60 @@ class Game
 			}
 		}
 
-		public void MarkDangerousPaths(Bomb b)
+		public void MarkDangerousPaths(Bomb b, List<StringBuilder> grid = this.Grid)
 		{
 			bool checkUp = true, checkDown = true, checkRight = true, checkLeft = true;
 			if (b.RoundsLeft == 1)
 			{
 				for (var i = 1; i < b.BombRadius; i++) 
 				{
-					if (checkUp && b.Y - i >= 0 && Grid[b.Y - i][b.X] == '.')
-						Grid[b.Y - i][b.X] = '@';
+					if (checkUp && b.Y - i >= 0 && grid[b.Y - i][b.X] == '.')
+						grid[b.Y - i][b.X] = '@';
 					else
 						checkUp = false;
 
-					if (checkDown && b.Y + i < this.Height && Grid[b.Y + i][b.X] == '.')
-						Grid[b.Y + i][b.X] = '@';
+					if (checkDown && b.Y + i < this.Height && grid[b.Y + i][b.X] == '.')
+						grid[b.Y + i][b.X] = '@';
 					else
 						checkDown = false;
 
-					if (checkLeft && b.X - i >= 0 && Grid[b.Y][b.X - i] == '.')
-						Grid[b.Y][b.X - i] = '@';
+					if (checkLeft && b.X - i >= 0 && grid[b.Y][b.X - i] == '.')
+						grid[b.Y][b.X - i] = '@';
 					else
 						checkLeft = false;
 
-					if (checkRight && b.X + i < this.Width && Grid[b.Y][b.X + i] == '.')
-						Grid[b.Y][b.X + i] = '@';
+					if (checkRight && b.X + i < this.Width && grid[b.Y][b.X + i] == '.')
+						grid[b.Y][b.X + i] = '@';
 					else
 						checkRight = false;
 				}
 			}			
+		}
+
+		public bool IsSafeToBombHere(int x, int y, List<StringBuilder> grid = this.Grid)
+		{
+			// Using a BFS search from bomb's position to find wether you can be safe if you bomb (x, y)
+			Queue queue = new Queue();
+			queue.Enqueue(new Tuple<int, int>(players[myId].X, players[myId].Y)); // Enqueue the player position
+
+			while (queue.Count > 0) {
+
+				Tuple<int, int> pos = (Tuple<int, int>) queue.Dequeue();
+				int cellScore = map.CalculateScore(pos.Item1, pos.Item2, players[myId].BombRadius);
+				if (cellScore > maxScore) 
+				{
+					targetX = pos.Item1;
+					targetY = pos.Item2;
+					maxScore = cellScore;
+				}
+
+				// Queue next valid positions that hasn't be queued before
+				foreach (var p in map.GetValidAdjacentPositions(pos))
+				{
+					queue.Enqueue(p);
+				}
+
+			}
 		}
 
 		public List<Tuple<int, int>> GetValidAdjacentPositions (Tuple<int, int> p)
