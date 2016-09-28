@@ -160,27 +160,27 @@ class Game
 			for (var i = 1; i < radius; i++)
 			{
 
-				if (checkUp && y - i >= 0 && _boxesLabels.Contains(Grid[y - i][x]))
+				if (checkUp && y - i >= 0 && Grid[y - i][x] != '.')
 				{
-					score++;
+					if (_boxesLabels.Contains(Grid[y - i][x])) score++;
 					checkUp = false;
 				}
 
-				if (checkDown && y + i < this.Height && _boxesLabels.Contains(Grid[y + i][x]))
+				if (checkDown && y + i < this.Height && Grid[y + i][x] != '.')
 				{
-					score++;
+					if (_boxesLabels.Contains(Grid[y + i][x])) score++;
 					checkDown = false;
 				}
 
-				if (checkLeft && x - i >= 0 && _boxesLabels.Contains(Grid[y][x - i]))
+				if (checkLeft && x - i >= 0 && Grid[y][x - i] != '.')
 				{
-					score++;
+					if (_boxesLabels.Contains(Grid[y][x - i])) score++;
 					checkLeft = false;
 				}
 
-				if (checkRight && x + i < this.Width && _boxesLabels.Contains(Grid[y][x + i]))
+				if (checkRight && x + i < this.Width && Grid[y][x + i] != '.')
 				{
-					score++;
+					if (_boxesLabels.Contains(Grid[y][x + i])) score++;
 					checkRight = false;
 				}
 			}
