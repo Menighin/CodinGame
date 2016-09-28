@@ -43,6 +43,7 @@ class Game
 				{
 					Bomb b = new Bomb(owner, param1, param2, x, y);
 					map.MarkDeadBoxes(b);
+					map.MarkDangerousPaths(b);
 					bombs[owner] = b;
 					map.SetCell(x, y, 'b');
 				}
@@ -194,16 +195,17 @@ class Game
 		public void MarkDeadBoxes(Bomb b)
 		{
 			bool checkUp = true, checkDown = true, checkRight = true, checkLeft = true;
-			for (var i = 0; i < b.BombRadius; i++) {
+			for (var i = 0; i < b.BombRadius; i++) 
+			{
 				if (checkUp && b.Y - i >= 0 && _boxesLabels.Contains(Grid[b.Y - i][b.X]))
 				{
-					Grid[b.Y - 1][b.X] = '#';
+					Grid[b.Y - i][b.X] = '#';
 					checkUp = false;
 				}
 
 				if (checkDown && b.Y + i < this.Height && _boxesLabels.Contains(Grid[b.Y + i][b.X]))
 				{
-					Grid[b.Y + 1][b.X] = '#';
+					Grid[b.Y + i][b.X] = '#';
 					checkDown = false;
 				}
 
@@ -219,6 +221,36 @@ class Game
 					checkRight = false;
 				}
 			}
+		}
+
+		public void MarkDangerousPaths(Bomb b)
+		{
+			bool checkUp = true, checkDown = true, checkRight = true, checkLeft = true;
+			if (b.RoundsLeft == 1)
+			{
+				for (var i = 1; i < b.BombRadius; i++) 
+				{
+					if (checkUp && b.Y - i >= 0 && Grid[b.Y - i][b.X] == '.')
+						Grid[b.Y - i][b.X] = '@';
+					else
+						checkUp = false;
+
+					if (checkDown && b.Y + i < this.Height && Grid[b.Y + i][b.X] == '.')
+						Grid[b.Y + i][b.X] = '@';
+					else
+						checkDown = false;
+
+					if (checkLeft && b.X - i >= 0 && Grid[b.Y][b.X - i] == '.')
+						Grid[b.Y][b.X - i] = '@';
+					else
+						checkLeft = false;
+
+					if (checkRight && b.X + i < this.Width && Grid[b.Y][b.X + i] == '.')
+						Grid[b.Y][b.X + i] = '@';
+					else
+						checkRight = false;
+				}
+			}			
 		}
 
 		public List<Tuple<int, int>> GetValidAdjacentPositions (Tuple<int, int> p)
