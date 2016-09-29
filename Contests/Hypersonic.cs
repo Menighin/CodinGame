@@ -52,6 +52,7 @@ class Game
             
             // Process map
 			//map.PrintMap();
+			
 			int maxScore = 0;
 			int targetX = 0, targetY = 0;
 
@@ -59,29 +60,69 @@ class Game
 			Queue queue = new Queue();
 			queue.Enqueue(new Tuple<int, int>(players[myId].X, players[myId].Y)); // Enqueue the player position
 
-			while (queue.Count > 0) {
+			// If player is in danger, then it should get safe before thinking about bombing
+			if (players[myId].IsInDanger(map))
+			{
+				var processedPositions = new HashSet<Tuple<int, int>>();
 
-				Tuple<int, int> pos = (Tuple<int, int>) queue.Dequeue();
-				int cellScore = map.CalculateScore(pos.Item1, pos.Item2, players[myId].BombRadius);
-				if (cellScore > maxScore) 
-				{
-					targetX = pos.Item1;
-					targetY = pos.Item2;
-					maxScore = cellScore;
+				while (queue.Count > 0) {
+
+					Tuple<int, int> p = (Tuple<int, int>) queue.Dequeue();
+					
+					// If there is a empty not dangerous position, then it's safe to bomb (x, y)
+					if (map.GetCell(p.Item1, p.Item2) == '.') {
+						targetX = p.Item1;
+						targetY = p.Item2;
+					}
+
+					// Queue next valid positions that hasn't be queued before
+					if (p.Item1 - 1 >= 0 && (map.GetCell(p.Item1 - 1, p.Item2) == '.' || map.GetCell(p.Item1 - 1, p.Item2) == '@') && !processedPositions.Contains(new Tuple<int, int>(p.Item1 - 1, p.Item2)))
+						queue.Enqueue(new Tuple<int, int>(p.Item1 - 1, p.Item2));
+
+					if (p.Item2 - 1 >= 0 && (map.GetCell(p.Item1, p.Item2 - 1) == '.' || map.GetCell(p.Item1, p.Item2 - 1) == '@') && !processedPositions.Contains(new Tuple<int, int>(p.Item1, p.Item2 - 1)))
+						queue.Enqueue(new Tuple<int, int>(p.Item1, p.Item2 - 1));
+
+					if (p.Item1 + 1 < map.Width && (map.GetCell(p.Item1 + 1, p.Item2) == '.' || map.GetCell(p.Item1 + 1, p.Item2) == '@') && !processedPositions.Contains(new Tuple<int, int>(p.Item1 + 1, p.Item2)))
+						queue.Enqueue(new Tuple<int, int>(p.Item1 + 1, p.Item2));
+
+					if (p.Item2 + 1 < map.Height && (map.GetCell(p.Item1, p.Item2 + 1) == '.' || map.GetCell(p.Item1, p.Item2 + 1) == '@') && !processedPositions.Contains(new Tuple<int, int>(p.Item1, p.Item2 + 1)))
+						queue.Enqueue(new Tuple<int, int>(p.Item1, p.Item2 + 1));
+
+					processedPositions.Add(p);
+
 				}
 
-				// Queue next valid positions that hasn't be queued before
-				foreach (var p in map.GetValidAdjacentPositions(pos))
-				{
-					queue.Enqueue(p);
-				}
-
+				Console.WriteLine("MOVE " + targetX + " " + targetY + " DANGER! Going to: (" + targetX + ", " + targetY + ")");
+				
 			}
-			
-			if (players[myId].X == targetX && players[myId].Y == targetY)
-            	Console.WriteLine("BOMB " + targetX + " " + targetY + " KABOOM!");
-			else
-            	Console.WriteLine("MOVE " + targetX + " " + targetY + " Going to: (" + targetX + ", " + targetY + ")");
+			else 
+			{
+				#region Find best place for bomb
+				while (queue.Count > 0) {
+
+					Tuple<int, int> pos = (Tuple<int, int>) queue.Dequeue();
+					int cellScore = map.CalculateScore(pos.Item1, pos.Item2, players[myId].BombRadius);
+					if (cellScore > maxScore) 
+					{
+						targetX = pos.Item1;
+						targetY = pos.Item2;
+						maxScore = cellScore;
+					}
+
+					// Queue next valid positions that hasn't be queued before
+					foreach (var p in map.GetValidAdjacentPositions(pos))
+					{
+						queue.Enqueue(p);
+					}
+
+				}
+
+				if (players[myId].X == targetX && players[myId].Y == targetY)
+					Console.WriteLine("BOMB " + targetX + " " + targetY + " KABOOM!");
+				else
+					Console.WriteLine("MOVE " + targetX + " " + targetY + " Going to: (" + targetX + ", " + targetY + ")");
+				#endregion
+			}
 				
         }
     }
@@ -135,13 +176,30 @@ class Game
 		    Grid[y][x] = value;
 		}
 
-		public void PrintMap() 
+		public void PrintMap(List<StringBuilder> grid = null) 
 		{
+			grid = grid ?? this.Grid;
 			Console.Error.WriteLine("\n");
 			
-			foreach(var l in this.Grid)
+			foreach(var l in grid)
 			{
 				Console.Error.WriteLine(l);
+			}
+
+			Console.Error.WriteLine("\n");
+		}
+
+		public void PrintScoreMatrix(int[,] matrix = null) {
+			matrix = matrix ?? this.ProcessedGrid;
+			
+			Console.Error.WriteLine("\n");
+			
+			for(var h = 0; h < this.Height; h++)
+			{
+				string s = "";
+				for (var w = 0; w < this.Width; w++)
+					s += matrix[h, w] + " ";
+				Console.Error.WriteLine(s);
 			}
 
 			Console.Error.WriteLine("\n");
@@ -189,10 +247,14 @@ class Game
 			var gridCopy = new List<StringBuilder>(this.Grid.Select(l => new StringBuilder(l.ToString())));
 			
 			// Mark the dangerous paths if the bomb is put in this position
-			this.MarkDangerousPaths(new Bomb(0, 8, radius, x, y), gridCopy);
+			this.MarkDangerousPaths(new Bomb(0, 1, radius, x, y), gridCopy);
+
+			gridCopy[y][x] = 'p';
+
+			//this.PrintMap(gridCopy);
 
 			if (!this.IsSafeToBombHere(x, y, gridCopy)) // Check wether is safe to put a bomb here
-				score = -1;
+				score = 0;
 			
             ProcessedGrid[y, x] = score;
 
@@ -231,10 +293,11 @@ class Game
 			}
 		}
 
-		public void MarkDangerousPaths(Bomb b, List<StringBuilder> grid = this.Grid)
+		public void MarkDangerousPaths(Bomb b, List<StringBuilder> grid = null)
 		{
+			grid = grid ?? this.Grid;
 			bool checkUp = true, checkDown = true, checkRight = true, checkLeft = true;
-			if (b.RoundsLeft == 1)
+			if (b.RoundsLeft <= 2)
 			{
 				for (var i = 1; i < b.BombRadius; i++) 
 				{
@@ -258,33 +321,44 @@ class Game
 					else
 						checkRight = false;
 				}
-			}			
+		}			
 		}
 
-		public bool IsSafeToBombHere(int x, int y, List<StringBuilder> grid = this.Grid)
+		public bool IsSafeToBombHere(int x, int y, List<StringBuilder> grid = null)
 		{
+			grid = grid ?? this.Grid;
+
 			// Using a BFS search from bomb's position to find wether you can be safe if you bomb (x, y)
 			Queue queue = new Queue();
-			queue.Enqueue(new Tuple<int, int>(players[myId].X, players[myId].Y)); // Enqueue the player position
+			queue.Enqueue(new Tuple<int, int>(x, y)); // Enqueue the player position
+
+			var processedPositions = new HashSet<Tuple<int, int>>();
 
 			while (queue.Count > 0) {
 
-				Tuple<int, int> pos = (Tuple<int, int>) queue.Dequeue();
-				int cellScore = map.CalculateScore(pos.Item1, pos.Item2, players[myId].BombRadius);
-				if (cellScore > maxScore) 
-				{
-					targetX = pos.Item1;
-					targetY = pos.Item2;
-					maxScore = cellScore;
-				}
+				Tuple<int, int> p = (Tuple<int, int>) queue.Dequeue();
+				
+				// If there is a empty not dangerous position, then it's safe to bomb (x, y)
+				if (grid[p.Item2][p.Item1] == '.') return true;
 
 				// Queue next valid positions that hasn't be queued before
-				foreach (var p in map.GetValidAdjacentPositions(pos))
-				{
-					queue.Enqueue(p);
-				}
+				if (p.Item1 - 1 >= 0 && (grid[p.Item2][p.Item1 - 1] == '.' || grid[p.Item2][p.Item1 - 1] == '@') && !processedPositions.Contains(new Tuple<int, int>(p.Item1 - 1, p.Item2)))
+					queue.Enqueue(new Tuple<int, int>(p.Item1 - 1, p.Item2));
+
+				if (p.Item2 - 1 >= 0 && (grid[p.Item2 - 1][p.Item1] == '.' || grid[p.Item2 - 1][p.Item1] == '@') && !processedPositions.Contains(new Tuple<int, int>(p.Item1, p.Item2 - 1)))
+					queue.Enqueue(new Tuple<int, int>(p.Item1, p.Item2 - 1));
+
+				if (p.Item1 + 1 < Width && (grid[p.Item2][p.Item1 + 1] == '.' || grid[p.Item2][p.Item1 + 1] == '@') && !processedPositions.Contains(new Tuple<int, int>(p.Item1 + 1, p.Item2)))
+					queue.Enqueue(new Tuple<int, int>(p.Item1 + 1, p.Item2));
+
+				if (p.Item2 + 1 < Height && (grid[p.Item2 + 1][p.Item1] == '.' || grid[p.Item2 + 1][p.Item1] == '@') && !processedPositions.Contains(new Tuple<int, int>(p.Item1, p.Item2 + 1)))
+					queue.Enqueue(new Tuple<int, int>(p.Item1, p.Item2 + 1));
+
+				processedPositions.Add(p);
 
 			}
+
+			return false;
 		}
 
 		public List<Tuple<int, int>> GetValidAdjacentPositions (Tuple<int, int> p)
@@ -324,6 +398,12 @@ class Game
 			X = x;
 			Y = y;
 		}
+
+		public bool IsInDanger(Map map)
+		{
+			return map.GetCell(X, Y) == '@';
+		}
+
 	}
 
 	// Class to represent a bomb
