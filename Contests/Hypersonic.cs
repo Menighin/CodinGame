@@ -23,7 +23,7 @@ class Game
             map.ReadMap();
 			
 			var players = new Dictionary<int, Player>();
-			var bombs = new Dictionary<int, Bomb>();
+			var bombs = new Dictionary<int, List<Bomb>>();
             
             // Read the entities
             int entities = int.Parse(Console.ReadLine());
@@ -43,17 +43,21 @@ class Game
 				{
 					Bomb b = new Bomb(owner, param1, param2, x, y);
 					map.MarkDeadBoxes(b);
-					map.MarkDangerousPaths(b);
-					bombs[owner] = b;
+
+					if (!bombs.ContainsKey(owner))
+						bombs[owner] = new List<Bomb>();
+
+					bombs[owner].Add(b);
 					map.SetCell(x, y, 'b');
 				}
-
             }
-            
+			map.Bombs = bombs.Values.SelectMany(x => x).ToList();
+			map.MarkDangerousPaths();
+
             // Process map
 			//map.PrintMap();
 			
-			int maxScore = 0;
+			int maxScore = -100;
 			int targetX = 0, targetY = 0;
 
 			// Using a BFS search from players position to find the better place he can put the bomb
@@ -73,6 +77,7 @@ class Game
 					if (map.GetCell(p.Item1, p.Item2) == '.') {
 						targetX = p.Item1;
 						targetY = p.Item2;
+						break;
 					}
 
 					// Queue next valid positions that hasn't be queued before
@@ -123,7 +128,9 @@ class Game
 					Console.WriteLine("MOVE " + targetX + " " + targetY + " Going to: (" + targetX + ", " + targetY + ")");
 				#endregion
 			}
-				
+			
+			 //map.PrintMap();
+			// map.PrintScoreMatrix();
         }
     }
 
@@ -142,7 +149,8 @@ class Game
         public int[,] ProcessedGrid {get; set;}
         public int Height {get; set;}
 		public int Width {get; set;}
-		private String _boxesLabels = "012"; 
+		private String _boxesLabels = "012";
+		public List<Bomb> Bombs {get;set;}
 
 		public Map(int height, int width) 
 		{
@@ -157,7 +165,7 @@ class Game
 
 			for (var i = 0; i < Height; i++)
 				for (var j = 0; j < Width; j++)
-					this.ProcessedGrid[i, j] = -1;
+					this.ProcessedGrid[i, j] = -2;
 
             for (int i = 0; i < this.Height; i++)
             {
@@ -247,14 +255,14 @@ class Game
 			var gridCopy = new List<StringBuilder>(this.Grid.Select(l => new StringBuilder(l.ToString())));
 			
 			// Mark the dangerous paths if the bomb is put in this position
-			this.MarkDangerousPaths(new Bomb(0, 1, radius, x, y), gridCopy);
+			this.MarkDangerousPaths(new List<Bomb>(){new Bomb(0, 1, radius, x, y)}, gridCopy);
 
 			gridCopy[y][x] = 'p';
 
 			//this.PrintMap(gridCopy);
 
 			if (!this.IsSafeToBombHere(x, y, gridCopy)) // Check wether is safe to put a bomb here
-				score = 0;
+				score = -1;
 			
             ProcessedGrid[y, x] = score;
 
@@ -293,35 +301,115 @@ class Game
 			}
 		}
 
-		public void MarkDangerousPaths(Bomb b, List<StringBuilder> grid = null)
+		public void MarkDangerousPaths(List<Bomb> bombs = null, List<StringBuilder> grid = null)
 		{
 			grid = grid ?? this.Grid;
-			bool checkUp = true, checkDown = true, checkRight = true, checkLeft = true;
-			if (b.RoundsLeft <= 2)
+			if (bombs == null)
+				bombs = Bombs;
+			else
+				bombs.AddRange(Bombs);
+
+			var checkedBombs = new HashSet<Bomb>();
+			var bombsChained = new Queue();
+			var bombsByPosition = new Dictionary<Tuple<int, int>, Bomb>();
+
+			// Preprocess into dictionary to check for bomb chains
+			foreach (Bomb b in bombs)
+				bombsByPosition[new Tuple<int, int>(b.X, b.Y)] = b;
+
+			foreach (Bomb b in bombs)
 			{
+				bool checkUp = true, checkDown = true, checkRight = true, checkLeft = true;
+			
+					checkedBombs.Add(b);
+					for (var i = 1; i < b.BombRadius; i++) 
+					{
+						if (checkUp && b.Y - i >= 0 && grid[b.Y - i][b.X] == '.')
+							grid[b.Y - i][b.X] = '@';
+						else 
+						{
+							checkUp = false;
+							if (b.Y - i >= 0 && grid[b.Y - i][b.X] == 'b' && !checkedBombs.Contains(bombsByPosition[new Tuple<int, int>(b.X, b.Y - i)]))
+								bombsChained.Enqueue(bombsByPosition[new Tuple<int, int>(b.X, b.Y - i)]);
+						}
+
+						if (checkDown && b.Y + i < this.Height && grid[b.Y + i][b.X] == '.')
+							grid[b.Y + i][b.X] = '@';
+						else
+						{
+							checkDown = false;
+							if ( b.Y + i < this.Height && grid[b.Y + i][b.X] == 'b' && !checkedBombs.Contains(bombsByPosition[new Tuple<int, int>(b.X, b.Y + i)]))
+								bombsChained.Enqueue(bombsByPosition[new Tuple<int, int>(b.X, b.Y + i)]);
+						}
+
+						if (checkLeft && b.X - i >= 0 && grid[b.Y][b.X - i] == '.')
+							grid[b.Y][b.X - i] = '@';
+						else
+						{
+							checkLeft = false;
+							if (b.X - i >= 0 && grid[b.Y][b.X - i] == 'b' && !checkedBombs.Contains(bombsByPosition[new Tuple<int, int>(b.X - i, b.Y)]))
+								bombsChained.Enqueue(bombsByPosition[new Tuple<int, int>(b.X - i, b.Y)]);
+						}
+
+						if (checkRight && b.X + i < this.Width && grid[b.Y][b.X + i] == '.')
+							grid[b.Y][b.X + i] = '@';
+						else
+						{
+							checkRight = false;
+							if (b.X + i < this.Width && grid[b.Y][b.X + i] == 'b' && !checkedBombs.Contains(bombsByPosition[new Tuple<int, int>(b.X + i, b.Y)]))
+								bombsChained.Enqueue(bombsByPosition[new Tuple<int, int>(b.X + i, b.Y)]);
+						}
+					
+				}
+			}
+
+			// Processing chained bombs
+			while (bombsChained.Count > 0)
+			{
+				Bomb b = (Bomb) bombsChained.Dequeue();
+
+				checkedBombs.Add(b);
+				bool checkUp = true, checkDown = true, checkRight = true, checkLeft = true;
 				for (var i = 1; i < b.BombRadius; i++) 
 				{
 					if (checkUp && b.Y - i >= 0 && grid[b.Y - i][b.X] == '.')
 						grid[b.Y - i][b.X] = '@';
-					else
+					else 
+					{
 						checkUp = false;
+						if (b.Y - i >= 0 && grid[b.Y - i][b.X] == 'b' && !checkedBombs.Contains(bombsByPosition[new Tuple<int, int>(b.X, b.Y - i)]))
+							bombsChained.Enqueue(bombsByPosition[new Tuple<int, int>(b.X, b.Y - i)]);
+					}
 
 					if (checkDown && b.Y + i < this.Height && grid[b.Y + i][b.X] == '.')
 						grid[b.Y + i][b.X] = '@';
 					else
+					{
 						checkDown = false;
+						if ( b.Y + i < this.Height && grid[b.Y + i][b.X] == 'b' && !checkedBombs.Contains(bombsByPosition[new Tuple<int, int>(b.X, b.Y + i)]))
+							bombsChained.Enqueue(bombsByPosition[new Tuple<int, int>(b.X, b.Y + i)]);
+					}
 
 					if (checkLeft && b.X - i >= 0 && grid[b.Y][b.X - i] == '.')
 						grid[b.Y][b.X - i] = '@';
 					else
+					{
 						checkLeft = false;
+						if (b.X - i >= 0 && grid[b.Y][b.X - i] == 'b' && !checkedBombs.Contains(bombsByPosition[new Tuple<int, int>(b.X - i, b.Y)]))
+							bombsChained.Enqueue(bombsByPosition[new Tuple<int, int>(b.X - i, b.Y)]);
+					}
 
 					if (checkRight && b.X + i < this.Width && grid[b.Y][b.X + i] == '.')
 						grid[b.Y][b.X + i] = '@';
 					else
+					{
 						checkRight = false;
+						if (b.X + i < this.Width && grid[b.Y][b.X + i] == 'b' && !checkedBombs.Contains(bombsByPosition[new Tuple<int, int>(b.X + i, b.Y)]))
+							bombsChained.Enqueue(bombsByPosition[new Tuple<int, int>(b.X + i, b.Y)]);
+					}
 				}
-		}			
+			}
+
 		}
 
 		public bool IsSafeToBombHere(int x, int y, List<StringBuilder> grid = null)
@@ -364,16 +452,16 @@ class Game
 		public List<Tuple<int, int>> GetValidAdjacentPositions (Tuple<int, int> p)
 		{
 			var list = new List<Tuple<int, int>>();
-			if (p.Item1 - 1 >= 0 && Grid[p.Item2][p.Item1 - 1] == '.' && ProcessedGrid[p.Item2, p.Item1 - 1] == -1)
+			if (p.Item1 - 1 >= 0 && Grid[p.Item2][p.Item1 - 1] == '.' && ProcessedGrid[p.Item2, p.Item1 - 1] == -2)
 				list.Add(new Tuple<int, int>(p.Item1 - 1, p.Item2));
 
-			if (p.Item2 - 1 >= 0 && Grid[p.Item2 - 1][p.Item1] == '.' && ProcessedGrid[p.Item2 - 1, p.Item1] == -1)
+			if (p.Item2 - 1 >= 0 && Grid[p.Item2 - 1][p.Item1] == '.' && ProcessedGrid[p.Item2 - 1, p.Item1] == -2)
 				list.Add(new Tuple<int, int>(p.Item1, p.Item2 - 1));
 
-			if (p.Item1 + 1 < Width && Grid[p.Item2][p.Item1 + 1] == '.' && ProcessedGrid[p.Item2, p.Item1 + 1] == -1)
+			if (p.Item1 + 1 < Width && Grid[p.Item2][p.Item1 + 1] == '.' && ProcessedGrid[p.Item2, p.Item1 + 1] == -2)
 				list.Add(new Tuple<int, int>(p.Item1 + 1, p.Item2));
 
-			if (p.Item2 + 1 < Height && Grid[p.Item2 + 1][p.Item1] == '.' && ProcessedGrid[p.Item2 + 1, p.Item1] == -1)
+			if (p.Item2 + 1 < Height && Grid[p.Item2 + 1][p.Item1] == '.' && ProcessedGrid[p.Item2 + 1, p.Item1] == -2)
 				list.Add(new Tuple<int, int>(p.Item1, p.Item2 + 1));
 
 			return list;
@@ -401,7 +489,23 @@ class Game
 
 		public bool IsInDanger(Map map)
 		{
-			return map.GetCell(X, Y) == '@';
+			return map.GetCell(X, Y) == '@' || map.GetCell(X, Y) == 'b';
+		}
+
+		public override bool Equals(object obj)
+		{
+			var other = obj as Player;
+			return this.X == other.X && this.Y == other.Y && this.Id == other.Id;
+		}
+
+		public override int GetHashCode()
+		{
+			int hash = 13;
+			hash = (hash * 7) + this.X.GetHashCode();
+			hash = (hash * 7) + this.Y.GetHashCode();
+			hash = (hash * 7) + this.Id.GetHashCode();
+
+			return hash;
 		}
 
 	}
@@ -422,6 +526,21 @@ class Game
 			BombRadius = range;
 			X = x;
 			Y = y;
+		}
+
+		public override bool Equals(object obj)
+		{
+			var other = obj as Bomb;
+			return this.X == other.X && this.Y == other.Y;
+		}
+
+		public override int GetHashCode()
+		{
+			int hash = 13;
+			hash = (hash * 7) + this.X.GetHashCode();
+			hash = (hash * 7) + this.Y.GetHashCode();
+
+			return hash;
 		}
 	}
 }
