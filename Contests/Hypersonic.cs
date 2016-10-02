@@ -57,8 +57,8 @@ class Game
             // Process map
 			//map.PrintMap();
 			
-			int maxScore = -100;
-			int targetX = 0, targetY = 0;
+			int maxScore = -2;
+			int targetX = -10, targetY = -10;
 
 			// Using a BFS search from players position to find the better place he can put the bomb
 			Queue queue = new Queue();
@@ -104,9 +104,9 @@ class Game
 				Console.WriteLine("MOVE " + targetX + " " + targetY + " DANGER! Going to: (" + targetX + ", " + targetY + ")");
 				
 			}
-			else 
+			else // Find a place to bomb
 			{
-				#region Find best place for bomb
+
 				while (queue.Count > 0) {
 
 					Tuple<int, int, int> pos = (Tuple<int, int, int>) queue.Dequeue();
@@ -128,9 +128,44 @@ class Game
 
 				if (players[myId].X == targetX && players[myId].Y == targetY && maxScore > 0)
 					Console.WriteLine("BOMB " + targetX + " " + targetY + " KABOOM!");
-				else
+				else if (map.HasBox)
 					Console.WriteLine("MOVE " + targetX + " " + targetY + " Going to: (" + targetX + ", " + targetY + ")");
-				#endregion
+				else { // There is no boxes to hit anymore, going for the kill
+
+					// Marking enemies
+					foreach (Player e in players.Values.ToList())
+					{
+						if (e.Id != myId)
+							map.SetCell(e.X, e.Y, 'e');
+					}
+
+					var enemy = players.Values.ToList().FirstOrDefault(e => e.Id != myId);
+					
+					// Checking if a bomb here can kill an enemy 
+					if (map.CanItKillAnEnemy(players[myId]))
+					{
+						Console.WriteLine("BOMB " + players[myId].X + " " + players[myId].Y + " IMMA KILL YA");
+					}
+					else
+					{
+						Random rd = new Random();
+						int random = rd.Next(0, 5);
+
+						int posX = enemy.X;
+						int posY = enemy.Y;
+
+						if (random == 0) posX++;
+						if (random == 1) posX--;
+						if (random == 2) posY++;
+						if (random == 3) posY--;
+
+						if (random != 4 && map.IsSafeToBombHere(posX, posY))
+							Console.WriteLine("MOVE " + posX + " " + posY + " GOING IN FOR THE KILL");
+						else if (map.IsSafeToBombHere(posX, posY))
+							Console.WriteLine("BOMB " + posX + " " + posY + " GOING IN FOR THE KILL");
+					}
+
+				}
 			}
 			
 			 //map.PrintMap();
@@ -155,6 +190,7 @@ class Game
 		public int Width {get; set;}
 		private String _boxesLabels = "012";
 		public List<Bomb> Bombs {get;set;}
+		public bool HasBox {get; set;}
 
 		public Map(int height, int width) 
 		{
@@ -166,6 +202,7 @@ class Game
 		{
             this.Grid = new List<StringBuilder>();
             this.ProcessedGrid = new int[Height, Width];
+			this.HasBox = false;
 
 			for (var i = 0; i < Height; i++)
 				for (var j = 0; j < Width; j++)
@@ -175,6 +212,13 @@ class Game
             {
 				Grid.Add(new StringBuilder());
                 Grid[i].Append(Console.ReadLine());
+
+				foreach (var c in Grid[i].ToString()) {
+					if (_boxesLabels.Contains(c)) {
+						HasBox = true;
+						break;
+					}
+				}
             }
         }
         
@@ -443,6 +487,53 @@ class Game
 
 		}
 
+		public bool CanItKillAnEnemy(Player p, List<StringBuilder> grid = null)
+		{
+			grid = grid ?? this.Grid;			
+			bool checkUp = true, checkDown = true, checkRight = true, checkLeft = true;
+			var explosionExpansion = ".@&e";
+			for (var i = 1; i < p.BombRadius; i++) 
+			{
+				if (checkUp && p.Y - i >= 0 && explosionExpansion.Contains(grid[p.Y - i][p.X]))
+				{
+					if (grid[p.Y - i][p.X] == 'e') return true;
+				}
+				else 
+				{
+					checkUp = false;
+				}
+
+				if (checkDown && p.Y + i < this.Height && explosionExpansion.Contains(grid[p.Y + i][p.X]))
+				{
+					if ( grid[p.Y + i][p.X] == 'e') return true;
+				}
+				else
+				{
+					checkDown = false;
+				}
+
+				if (checkLeft && p.X - i >= 0 && explosionExpansion.Contains(grid[p.Y][p.X - i]))
+				{
+					if (grid[p.Y][p.X - i] == 'e') return true;
+				}
+				else
+				{
+					checkLeft = false;
+				}
+
+				if (checkRight && p.X + i < this.Width && explosionExpansion.Contains(grid[p.Y][p.X + i]))
+				{
+					if (grid[p.Y][p.X + i] == 'e') return true;
+				}
+				else
+				{
+					checkRight = false;
+				}
+			}
+
+			return false;
+		}
+
 		public bool IsSafeToBombHere(int x, int y, List<StringBuilder> grid = null)
 		{
 			grid = grid ?? this.Grid;
@@ -458,7 +549,7 @@ class Game
 				Tuple<int, int, int> p = (Tuple<int, int, int>) queue.Dequeue();
 				
 				// If there is a empty not dangerous position that the player can reach, then it's safe to bomb (x, y)
-				if (grid[p.Item2][p.Item1] == '.' && p.Item3 <= 3) 
+				if (p.Item1 >= 0 && p.Item2 >= 0 && p.Item1 < Width && p.Item2 < Height && grid[p.Item2][p.Item1] == '.' && p.Item3 <= 3) 
 				{
 					return true;
 				}
