@@ -449,34 +449,34 @@ class Game
 
 			// Using a BFS search from bomb's position to find wether you can be safe if you bomb (x, y)
 			Queue queue = new Queue();
-			queue.Enqueue(new Tuple<int, int>(x, y)); // Enqueue the player position
+			queue.Enqueue(new Tuple<int, int, int>(x, y, 0)); // Enqueue the player position
 
 			var processedPositions = new HashSet<Tuple<int, int>>();
 
 			while (queue.Count > 0) {
 
-				Tuple<int, int> p = (Tuple<int, int>) queue.Dequeue();
+				Tuple<int, int, int> p = (Tuple<int, int, int>) queue.Dequeue();
 				
 				// If there is a empty not dangerous position that the player can reach, then it's safe to bomb (x, y)
-				if (grid[p.Item2][p.Item1] == '.') 
+				if (grid[p.Item2][p.Item1] == '.' && p.Item3 <= 3) 
 				{
 					return true;
 				}
 
 				// Queue next valid positions that hasn't be queued before
 				if (p.Item1 - 1 >= 0 && (grid[p.Item2][p.Item1 - 1] == '.' || grid[p.Item2][p.Item1 - 1] == '@') && !processedPositions.Contains(new Tuple<int, int>(p.Item1 - 1, p.Item2)))
-					queue.Enqueue(new Tuple<int, int>(p.Item1 - 1, p.Item2));
+					queue.Enqueue(new Tuple<int, int, int>(p.Item1 - 1, p.Item2, p.Item3 + 1));
 
 				if (p.Item2 - 1 >= 0 && (grid[p.Item2 - 1][p.Item1] == '.' || grid[p.Item2 - 1][p.Item1] == '@') && !processedPositions.Contains(new Tuple<int, int>(p.Item1, p.Item2 - 1)))
-					queue.Enqueue(new Tuple<int, int>(p.Item1, p.Item2 - 1));
+					queue.Enqueue(new Tuple<int, int, int>(p.Item1, p.Item2 - 1, p.Item3 + 1));
 
 				if (p.Item1 + 1 < Width && (grid[p.Item2][p.Item1 + 1] == '.' || grid[p.Item2][p.Item1 + 1] == '@') && !processedPositions.Contains(new Tuple<int, int>(p.Item1 + 1, p.Item2)))
-					queue.Enqueue(new Tuple<int, int>(p.Item1 + 1, p.Item2));
+					queue.Enqueue(new Tuple<int, int, int>(p.Item1 + 1, p.Item2, p.Item3 + 1));
 
 				if (p.Item2 + 1 < Height && (grid[p.Item2 + 1][p.Item1] == '.' || grid[p.Item2 + 1][p.Item1] == '@') && !processedPositions.Contains(new Tuple<int, int>(p.Item1, p.Item2 + 1)))
-					queue.Enqueue(new Tuple<int, int>(p.Item1, p.Item2 + 1));
+					queue.Enqueue(new Tuple<int, int, int>(p.Item1, p.Item2 + 1, p.Item3 + 1));
 
-				processedPositions.Add(p);
+				processedPositions.Add(new Tuple<int, int>(p.Item1, p.Item2));
 
 			}
 
