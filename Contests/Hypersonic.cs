@@ -339,7 +339,9 @@ class Game
 				for (var i = 1; i < b.BombRadius; i++) 
 				{
 					if (checkUp && b.Y - i >= 0 && explosionExpansion.Contains(grid[b.Y - i][b.X]))
+					{
 						if (grid[b.Y - i][b.X] != '&') grid[b.Y - i][b.X] = EXPLOSION_PATH;
+					}
 					else 
 					{
 						checkUp = false;
@@ -348,7 +350,9 @@ class Game
 					}
 
 					if (checkDown && b.Y + i < this.Height && explosionExpansion.Contains(grid[b.Y + i][b.X]))
+					{
 						if ( grid[b.Y + i][b.X] != '&') grid[b.Y + i][b.X] = EXPLOSION_PATH;
+					}
 					else
 					{
 						checkDown = false;
@@ -357,7 +361,9 @@ class Game
 					}
 
 					if (checkLeft && b.X - i >= 0 && explosionExpansion.Contains(grid[b.Y][b.X - i]))
+					{
 						if (grid[b.Y][b.X - i] != '&') grid[b.Y][b.X - i] = EXPLOSION_PATH;
+					}
 					else
 					{
 						checkLeft = false;
@@ -366,7 +372,9 @@ class Game
 					}
 
 					if (checkRight && b.X + i < this.Width && explosionExpansion.Contains(grid[b.Y][b.X + i]))
+					{
 						if (grid[b.Y][b.X + i] != '&') grid[b.Y][b.X + i] = EXPLOSION_PATH;
+					}
 					else
 					{
 						checkRight = false;
@@ -388,7 +396,9 @@ class Game
 				for (var i = 1; i < b.BombRadius; i++) 
 				{
 					if (checkUp && b.Y - i >= 0 && explosionExpansion.Contains(grid[b.Y - i][b.X]))
+					{
 						if (grid[b.Y - i][b.X] != '&') grid[b.Y - i][b.X] = EXPLOSION_PATH;
+					}
 					else 
 					{
 						checkUp = false;
@@ -397,7 +407,9 @@ class Game
 					}
 
 					if (checkDown && b.Y + i < this.Height && explosionExpansion.Contains(grid[b.Y + i][b.X]))
+					{
 						if ( grid[b.Y + i][b.X] != '&') grid[b.Y + i][b.X] = EXPLOSION_PATH;
+					}
 					else
 					{
 						checkDown = false;
@@ -406,7 +418,9 @@ class Game
 					}
 
 					if (checkLeft && b.X - i >= 0 && explosionExpansion.Contains(grid[b.Y][b.X - i]))
+					{
 						if (grid[b.Y][b.X - i] != '&') grid[b.Y][b.X - i] = EXPLOSION_PATH;
+					}
 					else
 					{
 						checkLeft = false;
@@ -415,7 +429,9 @@ class Game
 					}
 
 					if (checkRight && b.X + i < this.Width && explosionExpansion.Contains(grid[b.Y][b.X + i]))
+					{
 						if (grid[b.Y][b.X + i] != '&') grid[b.Y][b.X + i] = EXPLOSION_PATH;
+					}
 					else
 					{
 						checkRight = false;
