@@ -62,7 +62,7 @@ class Game
 
 			// Using a BFS search from players position to find the better place he can put the bomb
 			Queue queue = new Queue();
-			queue.Enqueue(new Tuple<int, int>(players[myId].X, players[myId].Y)); // Enqueue the player position
+			queue.Enqueue(new Tuple<int, int, int>(players[myId].X, players[myId].Y, 0)); // Enqueue the player position
 
 			// If the player is one step away from killing himself, stay!
 			if (players[myId].CanKillMyselfOnNextRound(map))
@@ -71,11 +71,11 @@ class Game
 			}
 			else if (players[myId].IsInDanger(map))  // If player is in danger, then it should get safe before thinking about bombing
 			{
-				var processedPositions = new HashSet<Tuple<int, int>>();
+				var processedPositions = new HashSet<Tuple<int, int, int>>();
 
 				while (queue.Count > 0) {
 
-					Tuple<int, int> p = (Tuple<int, int>) queue.Dequeue();
+					Tuple<int, int, int> p = (Tuple<int, int, int>) queue.Dequeue();
 					
 					// If there is a empty not dangerous position, then it's safe to bomb (x, y)
 					if (map.GetCell(p.Item1, p.Item2) == '.') {
@@ -85,17 +85,17 @@ class Game
 					}
 
 					// Queue next valid positions that hasn't be queued before
-					if (p.Item1 - 1 >= 0 && (map.GetCell(p.Item1 - 1, p.Item2) == '.' || map.GetCell(p.Item1 - 1, p.Item2) == '@') && !processedPositions.Contains(new Tuple<int, int>(p.Item1 - 1, p.Item2)))
-						queue.Enqueue(new Tuple<int, int>(p.Item1 - 1, p.Item2));
+					if (p.Item1 - 1 >= 0 && (map.GetCell(p.Item1 - 1, p.Item2) == '.' || map.GetCell(p.Item1 - 1, p.Item2) == '@') && !processedPositions.Contains(new Tuple<int, int, int>(p.Item1 - 1, p.Item2, 0)))
+						queue.Enqueue(new Tuple<int, int, int>(p.Item1 - 1, p.Item2, 0));
 
-					if (p.Item2 - 1 >= 0 && (map.GetCell(p.Item1, p.Item2 - 1) == '.' || map.GetCell(p.Item1, p.Item2 - 1) == '@') && !processedPositions.Contains(new Tuple<int, int>(p.Item1, p.Item2 - 1)))
-						queue.Enqueue(new Tuple<int, int>(p.Item1, p.Item2 - 1));
+					if (p.Item2 - 1 >= 0 && (map.GetCell(p.Item1, p.Item2 - 1) == '.' || map.GetCell(p.Item1, p.Item2 - 1) == '@') && !processedPositions.Contains(new Tuple<int, int, int>(p.Item1, p.Item2 - 1, 0)))
+						queue.Enqueue(new Tuple<int, int, int>(p.Item1, p.Item2 - 1, 0));
 
-					if (p.Item1 + 1 < map.Width && (map.GetCell(p.Item1 + 1, p.Item2) == '.' || map.GetCell(p.Item1 + 1, p.Item2) == '@') && !processedPositions.Contains(new Tuple<int, int>(p.Item1 + 1, p.Item2)))
-						queue.Enqueue(new Tuple<int, int>(p.Item1 + 1, p.Item2));
+					if (p.Item1 + 1 < map.Width && (map.GetCell(p.Item1 + 1, p.Item2) == '.' || map.GetCell(p.Item1 + 1, p.Item2) == '@') && !processedPositions.Contains(new Tuple<int, int, int>(p.Item1 + 1, p.Item2, 0)))
+						queue.Enqueue(new Tuple<int, int, int>(p.Item1 + 1, p.Item2, 0));
 
-					if (p.Item2 + 1 < map.Height && (map.GetCell(p.Item1, p.Item2 + 1) == '.' || map.GetCell(p.Item1, p.Item2 + 1) == '@') && !processedPositions.Contains(new Tuple<int, int>(p.Item1, p.Item2 + 1)))
-						queue.Enqueue(new Tuple<int, int>(p.Item1, p.Item2 + 1));
+					if (p.Item2 + 1 < map.Height && (map.GetCell(p.Item1, p.Item2 + 1) == '.' || map.GetCell(p.Item1, p.Item2 + 1) == '@') && !processedPositions.Contains(new Tuple<int, int, int>(p.Item1, p.Item2 + 1, 0)))
+						queue.Enqueue(new Tuple<int, int, int>(p.Item1, p.Item2 + 1, 0));
 
 					processedPositions.Add(p);
 
@@ -109,8 +109,8 @@ class Game
 				#region Find best place for bomb
 				while (queue.Count > 0) {
 
-					Tuple<int, int> pos = (Tuple<int, int>) queue.Dequeue();
-					int cellScore = map.CalculateScore(pos.Item1, pos.Item2, players[myId].BombRadius);
+					Tuple<int, int, int> pos = (Tuple<int, int, int>) queue.Dequeue();
+					int cellScore = map.CalculateScore(pos.Item1, pos.Item2, players[myId].BombRadius, pos.Item3);
 					if (cellScore > maxScore) 
 					{
 						targetX = pos.Item1;
@@ -121,7 +121,7 @@ class Game
 					// Queue next valid positions that hasn't be queued before
 					foreach (var p in map.GetValidAdjacentPositions(pos))
 					{
-						queue.Enqueue(p);
+						queue.Enqueue(new Tuple<int, int, int>(p.Item1, p.Item2, pos.Item3 + 1));
 					}
 
 				}
@@ -219,7 +219,7 @@ class Game
 			Console.Error.WriteLine("\n");
 		}
 
-		public int CalculateScore (int x, int y, int radius) 
+		public int CalculateScore (int x, int y, int radius, int distance) 
 		{
 			// If can't place a bomb, then it has no score
 			if (Grid[y][x] != '.') {
@@ -234,28 +234,31 @@ class Game
 			{
 				if (checkUp && y - i >= 0 && Grid[y - i][x] != '.')
 				{
-					if (_boxesLabels.Contains(Grid[y - i][x])) score++;
+					if (_boxesLabels.Contains(Grid[y - i][x])) score += 1000;
 					checkUp = false;
 				}
 
 				if (checkDown && y + i < this.Height && Grid[y + i][x] != '.')
 				{
-					if (_boxesLabels.Contains(Grid[y + i][x])) score++;
+					if (_boxesLabels.Contains(Grid[y + i][x])) score += 1000;
 					checkDown = false;
 				}
 
 				if (checkLeft && x - i >= 0 && Grid[y][x - i] != '.')
 				{
-					if (_boxesLabels.Contains(Grid[y][x - i])) score++;
+					if (_boxesLabels.Contains(Grid[y][x - i])) score += 1000;
 					checkLeft = false;
 				}
 
 				if (checkRight && x + i < this.Width && Grid[y][x + i] != '.')
 				{
-					if (_boxesLabels.Contains(Grid[y][x + i])) score++;
+					if (_boxesLabels.Contains(Grid[y][x + i])) score += 1000;
 					checkRight = false;
 				}
 			}
+			
+			if (distance > 5) // Penalize far bomb spots
+				score /= distance;
 
 			// Make a copy of actual grid state
 			var gridCopy = new List<StringBuilder>(this.Grid.Select(l => new StringBuilder(l.ToString())));
@@ -464,7 +467,7 @@ class Game
 			return false;
 		}
 
-		public List<Tuple<int, int>> GetValidAdjacentPositions (Tuple<int, int> p)
+		public List<Tuple<int, int>> GetValidAdjacentPositions (Tuple<int, int, int> p)
 		{
 			var list = new List<Tuple<int, int>>();
 			if (p.Item1 - 1 >= 0 && Grid[p.Item2][p.Item1 - 1] == '.' && ProcessedGrid[p.Item2, p.Item1 - 1] == -2)
