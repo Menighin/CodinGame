@@ -40,10 +40,11 @@ class Player
                 int enemyY = int.Parse(inputs[2]);
                 int enemyLife = int.Parse(inputs[3]);
 
-				enemies.Add(new Enemy(enemyId, enemyX, enemyY, enemyLife));
+				var enemy = new Enemy(enemyId, enemyX, enemyY, enemyLife); 
+				enemies.Add(enemy);
             }
 
-            Console.WriteLine(String.Format("SHOOT {0}", enemies.First().Id)); // MOVE x y or SHOOT id
+            Console.WriteLine(String.Format("SHOOT {0}", enemies.OrderBy(e => e.GetLifeLeftIfShootFrom(x, y)).First().Id)); // MOVE x y or SHOOT id
         }
     }
 
@@ -74,6 +75,20 @@ class Player
 			this.X = x;
 			this.Y = y;
 			this.Life = life;
+		}
+
+		public double GetDistanceFrom(int x, int y)
+		{
+			return Math.Sqrt(Math.Pow(x - this.X, 2) + Math.Pow(y - this.Y, 2));
+		}
+
+		public int GetLifeLeftIfShootFrom(int x, int y)
+		{
+			double dist = this.GetDistanceFrom(x, y);
+
+			int damageDealt = Convert.ToInt32(Math.Round(125000/Math.Pow(dist, 1.2)));
+
+			return this.Life - damageDealt;
 		}
 	}
 }
