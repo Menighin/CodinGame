@@ -7,6 +7,15 @@ using System.Collections.Generic;
 
 class Player
 {
+	public enum DebugLevel {
+		None,
+		Macro,
+		Micro,
+		Detailed
+	};
+
+	private static DebugLevel _debugLevel = DebugLevel.None;
+
     static void Main(string[] args)
     {
         string[] inputs;
@@ -17,6 +26,7 @@ class Player
 
 			var dataPoints = new List<DataPoint>();
 			var enemies = new List<Enemy>();
+			var isWolffInDanger = false;
 
             inputs = Console.ReadLine().Split(' ');
             int x = int.Parse(inputs[0]);
@@ -40,11 +50,69 @@ class Player
                 int enemyY = int.Parse(inputs[2]);
                 int enemyLife = int.Parse(inputs[3]);
 
-				var enemy = new Enemy(enemyId, enemyX, enemyY, enemyLife); 
+				var enemy = new Enemy(enemyId, enemyX, enemyY, enemyLife, dataPoints);
+				
+				if (enemy.GetDistanceFrom(x, y) <= 2500) {
+					isWolffInDanger = true;
+					if (_debugLevel >= DebugLevel.Macro) Console.Error.WriteLine($"Wolff is in danger by enemy {enemy.Id}");
+				}
+
 				enemies.Add(enemy);
             }
 
-            Console.WriteLine(String.Format("SHOOT {0}", enemies.OrderBy(e => e.GetLifeLeftIfShootFrom(x, y)).First().Id)); // MOVE x y or SHOOT id
+			// If Wolff is in danger, move away from enemies
+			if (isWolffInDanger)
+			{
+				var validMoves = new List<Tuple<int, int>>() {
+					new Tuple<int, int>(x + 1000, y),
+					new Tuple<int, int>(x + 1000, y + 1000),
+					new Tuple<int, int>(x, y + 1000),
+					new Tuple<int, int>(x - 1000, y + 1000),
+					new Tuple<int, int>(x - 1000, y),
+					new Tuple<int, int>(x - 1000, y - 1000),
+					new Tuple<int, int>(x, y - 1000),
+					new Tuple<int, int>(x + 1000, y - 1000)
+				};
+
+				// Finding the best move
+				double maxScore = int.MinValue;
+				Tuple<int, int> moveWolff = null;
+
+				foreach (var move in validMoves)
+				{
+					var score = 0.0;
+					var suicideMove = false;
+					foreach (var enemy in enemies)
+					{
+						var dist = enemy.GetDistanceFrom(move.Item1, move.Item2);
+						if (dist < 2500) { suicideMove = true; break; }
+						score += dist;
+					}
+
+					if (_debugLevel >= DebugLevel.Micro) Console.Error.WriteLine($"Move: ({move.Item1}, {move.Item2}) | Score: {score}");
+
+					if (score > maxScore && !suicideMove) 
+					{
+						maxScore = score;
+						moveWolff = move;
+					}
+				}
+
+				// If there isnt a valid move to get away, try to kill the closest enemy
+				if (moveWolff == null)
+				{
+            		Console.WriteLine($"SHOOT {enemies.OrderBy(e => e.GetDistanceFrom(x, y)).First().Id} Get away from me!");
+				}
+				else
+				{
+					Console.WriteLine($"MOVE {moveWolff.Item1} {moveWolff.Item2} Leave me alone!");
+				}
+
+			}
+			else
+			{
+            	Console.WriteLine($"SHOOT {enemies.OrderBy(e => e.GetLifeLeftIfShootFrom(x, y)).First().Id} Shoot that moth****cker!");
+			}
         }
     }
 
@@ -68,13 +136,25 @@ class Player
 		public int X {get; set; }
 		public int Y {get; set; }
 		public int Life {get; set; }
+		public DataPoint ClosestDatapoint {get; set; }
 
-		public Enemy(int id, int x, int y, int life)
+		public Enemy(int id, int x, int y, int life, IEnumerable<DataPoint> dataPoints)
 		{
 			this.Id = id;
 			this.X = x;
 			this.Y = y;
 			this.Life = life;
+
+			var minDist = int.MaxValue + 0.0;
+			foreach (var d in dataPoints)
+			{
+				var dist = this.GetDistanceFrom(d.X, d.Y);
+				if (dist < minDist)
+				{
+					minDist = dist;
+					this.ClosestDatapoint = d;
+				}
+			}
 		}
 
 		public double GetDistanceFrom(int x, int y)
