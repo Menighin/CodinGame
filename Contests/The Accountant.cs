@@ -5,7 +5,7 @@ using System.Text;
 using System.Collections;
 using System.Collections.Generic;
 
-class Player
+class Game
 {
 	public enum DebugLevel {
 		None,
@@ -19,18 +19,35 @@ class Player
     static void Main(string[] args)
     {
         string[] inputs;
+		List<DataPoint> dataPoints = null;
+		List<Enemy> enemies = null;
+		Dictionary<int, Enemy> enemiesPastState = null;
 
         // Game loop
         while (true)
         {
 
-			var dataPoints = new List<DataPoint>();
-			var enemies = new List<Enemy>();
+			// Getting the past state of enemies
+			enemiesPastState = new Dictionary<int, Enemy>();
+			if (enemies != null)
+			{
+				foreach (var e in enemies)
+				{
+					enemiesPastState[e.Id] = new Enemy(e);
+				}
+			}
+
+			// Reinitializing enemies
+			dataPoints = new List<DataPoint>();
+			enemies = new List<Enemy>();
 			var isWolffInDanger = false;
 
             inputs = Console.ReadLine().Split(' ');
             int x = int.Parse(inputs[0]);
             int y = int.Parse(inputs[1]);
+
+			var player = new Player("Wulff", x, y);
+
             int dataCount = int.Parse(Console.ReadLine());
             for (int i = 0; i < dataCount; i++)
             {
@@ -50,7 +67,9 @@ class Player
                 int enemyY = int.Parse(inputs[2]);
                 int enemyLife = int.Parse(inputs[3]);
 
-				var enemy = new Enemy(enemyId, enemyX, enemyY, enemyLife, dataPoints);
+				Enemy pastEnemy = null;
+				if (enemiesPastState != null) enemiesPastState.TryGetValue(enemyId, out pastEnemy);
+				var enemy = new Enemy(enemyId, enemyX, enemyY, enemyLife, dataPoints, pastEnemy, player);
 				
 				if (enemy.GetDistanceFrom(x, y) <= 2500) {
 					isWolffInDanger = true;
@@ -63,15 +82,20 @@ class Player
 			// If Wolff is in danger, move away from enemies
 			if (isWolffInDanger)
 			{
+				int minX = (x - 1000 < 0 ? 0 : x - 1000);
+				int minY = (y - 1000 < 0 ? 0 : y - 1000);
+				int maxX = (x + 1000 > 16000 ? 16000 : x + 1000);
+				int maxY = (y + 1000 > 9000 ? 9000 : y + 1000);
+
 				var validMoves = new List<Tuple<int, int>>() {
-					new Tuple<int, int>(x + 1000, y),
-					new Tuple<int, int>(x + 1000, y + 1000),
-					new Tuple<int, int>(x, y + 1000),
-					new Tuple<int, int>(x - 1000, y + 1000),
-					new Tuple<int, int>(x - 1000, y),
-					new Tuple<int, int>(x - 1000, y - 1000),
-					new Tuple<int, int>(x, y - 1000),
-					new Tuple<int, int>(x + 1000, y - 1000)
+					new Tuple<int, int>(maxX, y),
+					new Tuple<int, int>(maxX, maxY),
+					new Tuple<int, int>(x, maxY),
+					new Tuple<int, int>(minX, maxY),
+					new Tuple<int, int>(minX, y),
+					new Tuple<int, int>(minX, minY),
+					new Tuple<int, int>(x, minY),
+					new Tuple<int, int>(maxX, minY)
 				};
 
 				// Finding the best move
@@ -101,7 +125,7 @@ class Player
 				// If there isnt a valid move to get away, try to kill the closest enemy
 				if (moveWolff == null)
 				{
-            		Console.WriteLine($"SHOOT {enemies.OrderBy(e => e.GetDistanceFrom(x, y)).First().Id} Get away from me!");
+            		Console.WriteLine($"SHOOT {enemies.OrderBy(e => e.GetDistanceFrom(player.X, player.Y)).First().Id} Get away from me!");
 				}
 				else
 				{
@@ -111,10 +135,24 @@ class Player
 			}
 			else
 			{
-            	Console.WriteLine($"SHOOT {enemies.OrderBy(e => e.GetLifeLeftIfShootFrom(x, y)).First().Id} Shoot that moth****cker!");
+            	Console.WriteLine($"SHOOT {enemies.OrderBy(e => e.GetLifeLeftIfShootFrom(player.X, player.Y)).First().Id} Shoot that moth****cker!");
 			}
         }
     }
+
+	public class Player
+	{
+		public String Name {get; set; }
+		public int X {get; set; }
+		public int Y {get; set; }
+
+		public Player(String name, int x, int y)
+		{
+			Name = name;
+			X = x;
+			Y = y;
+		}
+	}
 
 	public class DataPoint 
 	{
@@ -128,6 +166,13 @@ class Player
 			this.X = x;
 			this.Y = y;
 		}
+
+		public DataPoint(DataPoint dp)
+		{
+			this.Id = dp.Id;
+			this.X = dp.X;
+			this.Y = dp.Y;
+		}
 	}
 
 	public class Enemy 
@@ -137,8 +182,9 @@ class Player
 		public int Y {get; set; }
 		public int Life {get; set; }
 		public DataPoint ClosestDatapoint {get; set; }
+		public bool IsGettingCloser{get; set;}
 
-		public Enemy(int id, int x, int y, int life, IEnumerable<DataPoint> dataPoints)
+		public Enemy(int id, int x, int y, int life, IEnumerable<DataPoint> dataPoints, Enemy pastState, Player p)
 		{
 			this.Id = id;
 			this.X = x;
@@ -155,6 +201,18 @@ class Player
 					this.ClosestDatapoint = d;
 				}
 			}
+
+			IsGettingCloser = pastState != null && this.GetDistanceFrom(p.X, p.Y) < pastState.GetDistanceFrom(p.X, p.Y);
+		}
+
+		public Enemy(Enemy e)
+		{
+			this.Id = e.Id;
+			this.X = e.X;
+			this.Y = e.Y;
+			this.Life = e.Life;
+			this.IsGettingCloser = e.IsGettingCloser;
+			this.ClosestDatapoint = new DataPoint(e.ClosestDatapoint);
 		}
 
 		public double GetDistanceFrom(int x, int y)
