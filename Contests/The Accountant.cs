@@ -14,7 +14,8 @@ class Game
 		Detailed
 	};
 
-	private static DebugLevel _debugLevel = DebugLevel.None;
+	private static DebugLevel _debugLevel = DebugLevel.Micro;
+	private static int _safeDistance = 2500;
 
     static void Main(string[] args)
     {
@@ -46,6 +47,8 @@ class Game
             int x = int.Parse(inputs[0]);
             int y = int.Parse(inputs[1]);
 
+            if (_debugLevel >= DebugLevel.Macro) Console.Error.WriteLine($"Wolff is at ({x}, {y})");
+
 			var player = new Player("Wulff", x, y);
 
             int dataCount = int.Parse(Console.ReadLine());
@@ -71,7 +74,7 @@ class Game
 				if (enemiesPastState != null) enemiesPastState.TryGetValue(enemyId, out pastEnemy);
 				var enemy = new Enemy(enemyId, enemyX, enemyY, enemyLife, dataPoints, pastEnemy, player);
 				
-				if (enemy.GetDistanceFrom(x, y) <= 2500) {
+				if (enemy.GetDistanceFrom(x, y) <= _safeDistance) {
 					isWolffInDanger = true;
 					if (_debugLevel >= DebugLevel.Macro) Console.Error.WriteLine($"Wolff is in danger by enemy {enemy.Id}");
 				}
@@ -84,8 +87,8 @@ class Game
 			{
 				int minX = (x - 1000 < 0 ? 0 : x - 1000);
 				int minY = (y - 1000 < 0 ? 0 : y - 1000);
-				int maxX = (x + 1000 > 16000 ? 16000 : x + 1000);
-				int maxY = (y + 1000 > 9000 ? 9000 : y + 1000);
+				int maxX = (x + 1000 >= 16000 ? 15999 : x + 1000);
+				int maxY = (y + 1000 >= 9000 ? 8999 : y + 1000);
 
 				var validMoves = new List<Tuple<int, int>>() {
 					new Tuple<int, int>(maxX, y),
@@ -109,7 +112,7 @@ class Game
 					foreach (var enemy in enemies)
 					{
 						var dist = enemy.GetDistanceFrom(move.Item1, move.Item2);
-						if (dist < 2500) { suicideMove = true; break; }
+						if (dist < 2000) { suicideMove = true; break; }
 						score += dist;
 					}
 
@@ -123,7 +126,7 @@ class Game
 				}
 
 				// If there isnt a valid move to get away, try to kill the closest enemy
-				if (moveWolff == null)
+				if (moveWolff == null || (moveWolff.Item1 == player.X && moveWolff.Item2 == player.Y))
 				{
             		Console.WriteLine($"SHOOT {enemies.OrderBy(e => e.GetDistanceFrom(player.X, player.Y)).First().Id} Get away from me!");
 				}
@@ -135,7 +138,13 @@ class Game
 			}
 			else
 			{
-            	Console.WriteLine($"SHOOT {enemies.OrderBy(e => e.GetLifeLeftIfShootFrom(player.X, player.Y)).First().Id} Shoot that moth****cker!");
+			    var closestEnemy = enemies.OrderBy(e => e.GetDistanceFrom(player.X, player.Y)).First();
+			    if (!closestEnemy.IsGettingCloser && closestEnemy.GetDistanceFrom(player.X, player.Y) > 4000)
+			    {
+			        Console.WriteLine($"MOVE {closestEnemy.X} {closestEnemy.Y} Get back here!");
+			    }
+			    else
+            	    Console.WriteLine($"SHOOT {closestEnemy.Id} Get away from me!");
 			}
         }
     }
