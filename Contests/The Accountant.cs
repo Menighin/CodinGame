@@ -14,7 +14,7 @@ class Game
 		Detailed
 	};
 
-	private static DebugLevel _debugLevel = DebugLevel.Micro;
+	private static DebugLevel _debugLevel = DebugLevel.Detailed;
 	private static int _safeDistance = 2500;
 
     static void Main(string[] args)
@@ -90,16 +90,15 @@ class Game
 				int maxX = (x + 1000 >= 16000 ? 15999 : x + 1000);
 				int maxY = (y + 1000 >= 9000 ? 8999 : y + 1000);
 
-				var validMoves = new List<Tuple<int, int>>() {
-					new Tuple<int, int>(maxX, y),
-					new Tuple<int, int>(maxX, maxY),
-					new Tuple<int, int>(x, maxY),
-					new Tuple<int, int>(minX, maxY),
-					new Tuple<int, int>(minX, y),
-					new Tuple<int, int>(minX, minY),
-					new Tuple<int, int>(x, minY),
-					new Tuple<int, int>(maxX, minY)
-				};
+				var validMoves = new List<Tuple<int, int>>();
+
+				for (var i = 1; i <= 4; i += 1)
+					for (var j = 1; j <= 4; j += 1)
+					{
+						int xp = Convert.ToInt32(minX + ((maxX - minX) / i));
+						int yp = Convert.ToInt32(minY + ((maxY - minY) / j));
+						validMoves.Add(new Tuple<int, int>(xp, yp));
+					}
 
 				// Finding the best move
 				double maxScore = int.MinValue;
@@ -109,6 +108,7 @@ class Game
 				{
 					var score = 0.0;
 					var suicideMove = false;
+
 					foreach (var enemy in enemies)
 					{
 						var dist = enemy.GetDistanceFrom(move.Item1, move.Item2);
@@ -122,6 +122,15 @@ class Game
 					{
 						maxScore = score;
 						moveWolff = move;
+					}
+				}
+
+				if (_debugLevel >= DebugLevel.Detailed)
+				{
+					Console.Error.WriteLine($"Wolff will move into ({moveWolff.Item1}, {moveWolff.Item2})");
+					foreach (var enemy in enemies)
+					{
+						Console.Error.WriteLine($"Distance from enemy {enemy.Id}: {enemy.GetDistanceFrom(moveWolff.Item1, moveWolff.Item2)}");
 					}
 				}
 
@@ -192,6 +201,8 @@ class Game
 		public int Life {get; set; }
 		public DataPoint ClosestDatapoint {get; set; }
 		public bool IsGettingCloser{get; set;}
+		public int TurnsUntilDataPoint {get; set;}
+		public int TurnsToDieIfShot {get; set;}
 
 		public Enemy(int id, int x, int y, int life, IEnumerable<DataPoint> dataPoints, Enemy pastState, Player p)
 		{
@@ -210,6 +221,9 @@ class Game
 					this.ClosestDatapoint = d;
 				}
 			}
+			
+			this.TurnsUntilDataPoint = Convert.ToInt32(Math.Ceiling(minDist / 500));
+			this.TurnsToDieIfShot = Convert.ToInt32(Math.Ceiling(this.Life / this.GetDamageDealt(minDist)));
 
 			IsGettingCloser = pastState != null && this.GetDistanceFrom(p.X, p.Y) < pastState.GetDistanceFrom(p.X, p.Y);
 		}
@@ -229,11 +243,16 @@ class Game
 			return Math.Sqrt(Math.Pow(x - this.X, 2) + Math.Pow(y - this.Y, 2));
 		}
 
+		public double GetDamageDealt(double distance)
+		{
+			return Math.Round(125000/Math.Pow(distance, 1.2));
+		}
+
 		public int GetLifeLeftIfShootFrom(int x, int y)
 		{
 			double dist = this.GetDistanceFrom(x, y);
 
-			int damageDealt = Convert.ToInt32(Math.Round(125000/Math.Pow(dist, 1.2)));
+			int damageDealt = Convert.ToInt32(GetDamageDealt(dist));
 
 			return this.Life - damageDealt;
 		}
