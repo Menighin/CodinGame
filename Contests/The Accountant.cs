@@ -15,7 +15,7 @@ class Game
 	};
 
 	private static DebugLevel _debugLevel = DebugLevel.Detailed;
-	private static int _safeDistance = 2500;
+	private static int _safeDistance = 3000;
 
     static void Main(string[] args)
     {
@@ -82,6 +82,8 @@ class Game
 				enemies.Add(enemy);
             }
 
+			var closestEnemy = enemies.OrderBy(e => e.GetDistanceFrom(player.X, player.Y)).ThenBy(e => e.GetLifeLeftIfShootFrom(player.X, player.Y)).First();
+			
 			// If Wolff is in danger, move away from enemies
 			if (isWolffInDanger)
 			{
@@ -137,7 +139,7 @@ class Game
 				// If there isnt a valid move to get away, try to kill the closest enemy
 				if (moveWolff == null || (moveWolff.Item1 == player.X && moveWolff.Item2 == player.Y))
 				{
-            		Console.WriteLine($"SHOOT {enemies.OrderBy(e => e.GetDistanceFrom(player.X, player.Y)).First().Id} Get away from me!");
+            		Console.WriteLine($"SHOOT {closestEnemy.Id} Get away from me!");
 				}
 				else
 				{
@@ -147,13 +149,12 @@ class Game
 			}
 			else
 			{
-			    var closestEnemy = enemies.OrderBy(e => e.GetDistanceFrom(player.X, player.Y)).First();
-			    if (!closestEnemy.IsGettingCloser && closestEnemy.GetDistanceFrom(player.X, player.Y) > 4000)
+			    if (closestEnemy.GetDistanceFrom(player.X, player.Y) > 5000)
 			    {
-			        Console.WriteLine($"MOVE {closestEnemy.X} {closestEnemy.Y} Get back here!");
+			        Console.WriteLine($"MOVE {closestEnemy.X} {closestEnemy.Y} Get back here Enemy {closestEnemy.Id}!");
 			    }
 			    else
-            	    Console.WriteLine($"SHOOT {closestEnemy.Id} Get away from me!");
+            	    Console.WriteLine($"SHOOT {closestEnemy.Id} Die!");
 			}
         }
     }
