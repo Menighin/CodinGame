@@ -11,10 +11,11 @@ class Game
 		None,
 		Macro,
 		Micro,
-		Detailed
+		Detailed,
+		Temporary
 	};
 
-	private static DebugLevel _debugLevel = DebugLevel.Detailed;
+	private static DebugLevel _debugLevel = DebugLevel.Temporary;
 	private static int _safeDistance = 3000;
 
     static void Main(string[] args)
@@ -47,7 +48,7 @@ class Game
             int x = int.Parse(inputs[0]);
             int y = int.Parse(inputs[1]);
 
-            if (_debugLevel >= DebugLevel.Macro) Console.Error.WriteLine($"Wolff is at ({x}, {y})");
+            if (_debugLevel <= DebugLevel.Macro) Console.Error.WriteLine($"Wolff is at ({x}, {y})");
 
 			var player = new Player("Wulff", x, y);
 
@@ -76,14 +77,22 @@ class Game
 				
 				if (enemy.GetDistanceFrom(x, y) <= _safeDistance) {
 					isWolffInDanger = true;
-					if (_debugLevel >= DebugLevel.Macro) Console.Error.WriteLine($"Wolff is in danger by enemy {enemy.Id}");
+					if (_debugLevel <= DebugLevel.Macro) Console.Error.WriteLine($"Wolff is in danger by enemy {enemy.Id}");
+				}
+
+				if (_debugLevel == DebugLevel.Temporary)
+				{
+					Console.Error.WriteLine($"Enemy {enemy.Id} | Turns: {enemy.TurnsUntilDataPoint} | Die in: {enemy.TurnsToDieIfShot}");
 				}
 
 				enemies.Add(enemy);
             }
 
 			var closestEnemy = enemies.OrderBy(e => e.GetDistanceFrom(player.X, player.Y)).ThenBy(e => e.GetLifeLeftIfShootFrom(player.X, player.Y)).First();
+			var closestEnemyToDataPoint = enemies.OrderBy(e => e.TurnsUntilDataPoint).FirstOrDefault(e => e.TurnsUntilDataPoint >= e.TurnsToDieIfShot);
+
 			
+
 			// If Wolff is in danger, move away from enemies
 			if (isWolffInDanger)
 			{
@@ -114,11 +123,11 @@ class Game
 					foreach (var enemy in enemies)
 					{
 						var dist = enemy.GetDistanceFrom(move.Item1, move.Item2);
-						if (dist < 2000) { suicideMove = true; break; }
+						if (dist < 3000) { suicideMove = true; break; }
 						score += dist;
 					}
 
-					if (_debugLevel >= DebugLevel.Micro) Console.Error.WriteLine($"Move: ({move.Item1}, {move.Item2}) | Score: {score}");
+					if (_debugLevel <= DebugLevel.Temporary) Console.Error.WriteLine($"Move: ({move.Item1}, {move.Item2}) | Score: {score}");
 
 					if (score > maxScore && !suicideMove) 
 					{
@@ -127,7 +136,7 @@ class Game
 					}
 				}
 
-				if (_debugLevel >= DebugLevel.Detailed)
+				if (_debugLevel <= DebugLevel.Detailed && moveWolff != null)
 				{
 					Console.Error.WriteLine($"Wolff will move into ({moveWolff.Item1}, {moveWolff.Item2})");
 					foreach (var enemy in enemies)
@@ -149,12 +158,16 @@ class Game
 			}
 			else
 			{
-			    if (closestEnemy.GetDistanceFrom(player.X, player.Y) > 5000)
+			    if (closestEnemyToDataPoint != null && closestEnemyToDataPoint.GetDistanceFrom(player.X, player.Y) > 5000 && 
+					closestEnemyToDataPoint.TurnsUntilDataPoint != closestEnemyToDataPoint.TurnsToDieIfShot)
 			    {
-			        Console.WriteLine($"MOVE {closestEnemy.X} {closestEnemy.Y} Get back here Enemy {closestEnemy.Id}!");
+			        Console.WriteLine($"MOVE {closestEnemyToDataPoint.X} {closestEnemyToDataPoint.Y} Get back here Enemy {closestEnemyToDataPoint.Id}!");
 			    }
-			    else
-            	    Console.WriteLine($"SHOOT {closestEnemy.Id} Die!");
+			    else {
+					var dyingEnemy = enemies.FirstOrDefault(e => e.GetLifeLeftIfShootFrom(player.X, player.Y) <= 0);
+					var id = (dyingEnemy != null ? dyingEnemy.Id : (closestEnemyToDataPoint != null ? closestEnemyToDataPoint.Id : closestEnemy.Id));
+            	    Console.WriteLine($"SHOOT {id} Die!");					
+				}
 			}
         }
     }
@@ -224,7 +237,7 @@ class Game
 			}
 			
 			this.TurnsUntilDataPoint = Convert.ToInt32(Math.Ceiling(minDist / 500));
-			this.TurnsToDieIfShot = Convert.ToInt32(Math.Ceiling(this.Life / this.GetDamageDealt(minDist)));
+			this.TurnsToDieIfShot = Convert.ToInt32(Math.Ceiling(this.Life / this.GetDamageDealt(this.GetDistanceFrom(p.X, p.Y))));
 
 			IsGettingCloser = pastState != null && this.GetDistanceFrom(p.X, p.Y) < pastState.GetDistanceFrom(p.X, p.Y);
 		}
