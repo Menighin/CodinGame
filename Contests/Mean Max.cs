@@ -16,6 +16,7 @@ class Game
     {
         Reaper = 0,
         Destroyer = 1,
+        Doof = 2,
         Tanker = 3,
         Wreck = 4
     }
@@ -118,23 +119,30 @@ class Game
             // Find the closest tanker with water
             var closestTanker = FindClosestTanker(1);
 
+            // Find a wreck to bomb
+            var wreckerToBomb = FindWreckToBomb();
+
             // To debug: Console.Error.WriteLine("Debug messages...");
             if (closestWreck == null) {
                 Console.WriteLine("WAIT");
             } else {
-                Console.WriteLine($"{closestWreck.X} {closestWreck.Y} 300");
+                Console.WriteLine($"{closestWreck.X} {closestWreck.Y} 250");
             }
 
-            if (closestTanker == null) {
+            if (wreckerToBomb != null && players[0].Rage > 60) {
+                Console.WriteLine($"SKILL {wreckerToBomb.X} {wreckerToBomb.Y}");
+            }
+            else if (closestTanker == null) {
                 Console.WriteLine("WAIT");
-            } else {
-                Console.WriteLine($"{closestTanker.X} {closestTanker.Y} 300");
+            } 
+            else {
+                Console.WriteLine($"{closestTanker.X} {closestTanker.Y} 500");
             }
 
-            Console.WriteLine("WAIT");
+            // Doof follows enemy because why not
+            Console.WriteLine($"{players[1].Reaper.Position.X} {players[1].Reaper.Position.Y} 500 GET BACK HERE YOU");
         }
     }
-    
 
     public static Point FindClosestWreck() {
         Point closestWreck = null;
@@ -174,11 +182,32 @@ class Game
 
     public static bool IsInsideArea(Point p) {
         var center = new Point() { X = 0, Y = 0};
-        return CalculateDistance(p, center) < 6000;
+        return CalculateDistance(p, center) < 6000 - 500;
     }
 
     public static double CalculateDistance(Point p1, Point p2) {
         return Math.Sqrt(Math.Pow(p1.X - p2.X, 2) + Math.Pow(p1.Y - p2.Y, 2));
+    }
+
+    public static Point FindWreckToBomb() {
+        Point wreckToBomb = null;
+        var enemies = players.Values.Where(p => p.PlayerId != 0);
+        var player = players[0];
+        var closestToWreck = 9999999.0;
+
+        foreach (var w in wrecks) {
+            var distance = 0.0;
+            foreach (var e in enemies) {
+                distance = CalculateDistance(e.Reaper.Position, w.Position);
+                if (distance < closestToWreck && CalculateDistance(player.Reaper.Position, w.Position) > 1000) {
+                    closestToWreck = distance;
+                    wreckToBomb = w.Position;
+                }
+            }
+            
+        }
+
+        return closestToWreck < 700 ? wreckToBomb : null;
     }
 
     public class Reaper {
@@ -207,17 +236,32 @@ class Game
         }
     }
 
+    public class Doof {
+        public int Id { get; set; }
+        public float Mass { get; set; }
+        public int Radius { get; set; }
+        public Point Position { get; set; }
+        public Point Speed { get; set; }
+
+        public Doof() {
+            this.Position = new Point();
+            this.Speed = new Point();
+        }
+    }
+
     public class Player {
         public int PlayerId { get; set; }
         public int Score { get; set; }
         public int Rage { get; set; }
         public int Extra2 { get; set; }
         public Reaper Reaper { get; set; }
-        public Destroyer Destroyer {get; set;}
+        public Destroyer Destroyer { get; set; }
+        public Doof Doof { get; set; }
 
         public Player() {
             this.Reaper = new Reaper();
             this.Destroyer = new Destroyer();
+            this.Doof = new Doof();
         }
     }
 
