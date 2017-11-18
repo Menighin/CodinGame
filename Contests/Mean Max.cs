@@ -22,8 +22,8 @@ class Game
     }
 
     public static Dictionary<int, Player> players = new Dictionary<int, Player>();
-    public static List<Wreck> wrecks;
-    public static List<Tanker> tankers;
+    public static Dictionary<int, Wreck> wrecks;
+    public static Dictionary<int, Tanker> tankers;
 
     public static void Main(string[] args)
     {
@@ -45,8 +45,8 @@ class Game
             
             int unitCount = int.Parse(Console.ReadLine());
             
-            wrecks = new List<Wreck>();
-            tankers = new List<Tanker>();
+            wrecks = new Dictionary<int, Wreck>();
+            tankers = new Dictionary<int, Tanker>();
 
             for (int i = 0; i < unitCount; i++)
             {
@@ -96,7 +96,7 @@ class Game
                     tanker.Capacity = extra2;
                     tanker.IsInCircle = IsInsideArea(tanker.Position);
 
-                    tankers.Add(tanker);
+                    tankers[id] = tanker;
 
                 } else if (type == (int) UnitType.Wreck) {
 
@@ -107,7 +107,7 @@ class Game
                     wreck.Radius = radius;
                     wreck.Water = extra1;
 
-                    wrecks.Add(wreck);
+                    wrecks[id] = wreck;
                 }
             }
 
@@ -122,62 +122,67 @@ class Game
             // Find a wreck to bomb
             var wreckerToBomb = FindWreckToBomb();
 
+            // Find a good point to oil
+            var pointToOil = FindPointToOil();
+
             // To debug: Console.Error.WriteLine("Debug messages...");
             if (closestWreck == null) {
                 Console.WriteLine("WAIT");
             } else {
-                Console.WriteLine($"{closestWreck.X} {closestWreck.Y} 250");
+                var dist = (int) (CalculateDistance(closestWreck.Position, players[0].Reaper.Position));
+                var speed = dist / 4;
+                if (dist < players[0].Reaper.Radius + closestWreck.Radius - 500) speed = 10;
+                Console.WriteLine($"{closestWreck.Position.X} {closestWreck.Position.Y} {speed} {speed}");
             }
 
             if (wreckerToBomb != null && players[0].Rage > 60) {
-                Console.WriteLine($"SKILL {wreckerToBomb.X} {wreckerToBomb.Y}");
+                Console.WriteLine($"SKILL {wreckerToBomb.X} {wreckerToBomb.Y} BOMB");
             }
             else if (closestTanker == null) {
                 Console.WriteLine("WAIT");
             } 
             else {
-                Console.WriteLine($"{closestTanker.X} {closestTanker.Y} 500");
+                Console.WriteLine($"{closestTanker.Position.X} {closestTanker.Position.Y} 500");
             }
 
             // Doof follows enemy because why not
-            Console.WriteLine($"{players[1].Reaper.Position.X} {players[1].Reaper.Position.Y} 500 GET BACK HERE YOU");
+            if (pointToOil == null || players[0].Rage < 60)
+                Console.WriteLine($"{players[1].Reaper.Position.X} {players[1].Reaper.Position.Y} 500 GET BACK HERE YOU");
+            else
+                Console.WriteLine($"SKILL {pointToOil.X} {pointToOil.Y} DRIFT");
         }
     }
 
-    public static Point FindClosestWreck() {
-        Point closestWreck = null;
+    public static Wreck FindClosestWreck() {
         var distance = 99999999.0;
         var playerPos = players[0].Reaper.Position;
-        var wreckId = -1;
-        foreach(var w in wrecks) {
+        int? wreckId = null;
+        foreach(var w in wrecks.Values) {
             var distToWreck = CalculateDistance(w.Position, playerPos);
             if (distToWreck < distance) {
                 distance = distToWreck;
-                closestWreck = w.Position;
                 wreckId = w.Id;
             }
         }
         
         Console.Error.WriteLine($"Reaper going to {wreckId}");
-        return closestWreck;
+        return wreckId == null ? null : wrecks[wreckId.Value];
     }
 
-    public static Point FindClosestTanker(int water = 0) {
-        Point closestTanker = null;
+    public static Tanker FindClosestTanker(int water = 0) {
         double distance = 99999999.0;
         var playerPos = players[0].Destroyer.Position;
-        var tankerId = -1;
-        foreach(var t in tankers.Where(t => t.IsInCircle)) {
+        int? tankerId = null;
+        foreach(var t in tankers.Values.Where(t => t.IsInCircle)) {
             var distToTanker = CalculateDistance(t.Position, playerPos);
             if (distToTanker < distance) {
                 distance = distToTanker;
-                closestTanker = t.Position;
                 tankerId = t.Id;
             }
         }
         
         Console.Error.WriteLine($"Destroyer going to {tankerId}");
-        return closestTanker;
+        return tankerId == null ? null : tankers[tankerId.Value];
     }
 
     public static bool IsInsideArea(Point p) {
@@ -195,7 +200,12 @@ class Game
         var player = players[0];
         var closestToWreck = 9999999.0;
 
-        foreach (var w in wrecks) {
+        // Bomb if enemy is close to win
+        var winningEnemy = enemies.FirstOrDefault(e => e.Score > player.Score && e.Score > 40);
+        if (winningEnemy != null)
+            return winningEnemy.Reaper.Position;
+
+        foreach (var w in wrecks.Values) {
             var distance = 0.0;
             foreach (var e in enemies) {
                 distance = CalculateDistance(e.Reaper.Position, w.Position);
@@ -208,6 +218,16 @@ class Game
         }
 
         return closestToWreck < 700 ? wreckToBomb : null;
+    }
+
+    public static Point FindPointToOil() {
+        var enemies = players.Values.Where(p => p.PlayerId != 0);
+        var player = players[0];
+        // Oil if enemy is close to win
+        var winningEnemy = enemies.FirstOrDefault(e => e.Score > player.Score && e.Score > 35);
+        if (winningEnemy != null)
+            return winningEnemy.Reaper.Position;
+        return null;
     }
 
     public class Reaper {
