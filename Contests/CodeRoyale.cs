@@ -5,17 +5,13 @@ using System.Text;
 using System.Collections;
 using System.Collections.Generic;
 
-/**
- * Auto-generated code below aims at helping you parse
- * the standard input according to the problem statement.
- **/
-class Player
+class Game
 {
     static void Main(string[] args)
     {
         string[] inputs;
-        int numSites = int.Parse(Console.ReadLine());
-        for (int i = 0; i < numSites; i++)
+        Table.NumSites = int.Parse(Console.ReadLine());
+        for (int i = 0; i < Table.NumSites; i++)
         {
             inputs = Console.ReadLine().Split(' ');
             int siteId = int.Parse(inputs[0]);
@@ -30,7 +26,7 @@ class Player
             inputs = Console.ReadLine().Split(' ');
             int gold = int.Parse(inputs[0]);
             int touchedSite = int.Parse(inputs[1]); // -1 if none
-            for (int i = 0; i < numSites; i++)
+            for (int i = 0; i < Table.NumSites; i++)
             {
                 inputs = Console.ReadLine().Split(' ');
                 int siteId = int.Parse(inputs[0]);
@@ -56,4 +52,56 @@ class Player
             Console.WriteLine("TRAIN");
         }
     }
+}
+
+class Player {
+    public int Gold { get; set; }
+    public int TouchSite { get; set; }
+    public Unit Queen { get; set; }
+}
+
+static class Table {
+    public static int NumSites;
+    public static int NumUnits;
+}
+
+class Site {
+    public int Id { get; set; }
+    public int X { get; set; }
+    public int Y { get; set; }
+    public int Radius { get; set; } 
+    public StructureTypeEnum StructureType { get; set; }
+    public int NextSpawn { get; set; }
+    public int MyProperty { get; set; }
+}
+
+class Unit {
+    public int X { get; set; }
+    public int Y { get; set; }
+    public bool IsEnemy { get; set; }
+    public int HealthPoints { get; set; }
+    public UnitTypeEnum UnitType { get; set; }
+}
+
+enum StructureTypeEnum {
+    None = -1,
+    Barracs = 2
+}
+
+enum OwnerEnum {
+    None = -1,
+    Friendly = 0,
+    Enemy = 1
+}
+
+enum CreepTypeEnum {
+    None = -1,
+    Knight = 0,
+    Archer = 1
+}
+
+enum UnitTypeEnum {
+    Queen = -1,
+    Knight = 0,
+    Archer = 1
 }
