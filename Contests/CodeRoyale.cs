@@ -110,10 +110,17 @@ static class Player {
     public static bool? StartingSide = null; // True = right, False = left
     public static int NumKnights => Sites.Where(s => s.StructureType == StructureTypeEnum.Barracks && s.CreepType == CreepTypeEnum.Knight).Count();
     public static int NumArchers => Sites.Where(s => s.StructureType == StructureTypeEnum.Barracks && s.CreepType == CreepTypeEnum.Archer).Count();
+    public static int NumMines   => Sites.Where(s => s.StructureType == StructureTypeEnum.Mine).Count();
     public static int TrainedKnights = 0;
 
     public static int MustHaveArchers = 0;
     public static int MustHaveKnights = 1;
+    public static int MustHaveMines = 3;
+
+    public static bool HaveEnoughKnights => NumKnights >= MustHaveKnights;
+    public static bool HaveEnoughArchers => NumArchers >= MustHaveArchers;
+    public static bool HaveEnoughMines   => NumMines   >= MustHaveMines;
+    public static bool HaveEnoughStructures => HaveEnoughArchers && HaveEnoughKnights && HaveEnoughMines;
 
     public static bool HasEnoughGoldToTrain(CreepTypeEnum c) {
         return (c == CreepTypeEnum.Archer && Player.Gold >= 100) ||
@@ -131,19 +138,23 @@ static class Player {
         var closestEnemyCreep = Table.GetClosestPieceFrom(Player.Queen, Table.EnemyUnits);
 
         var closestEnemyCreepDistance = closestEnemyCreep == null ? (double?) null : Table.GetDistanceBetween(Player.Queen, closestEnemyCreep);
-        var isEnemyClose = closestEnemyCreepDistance < 80;
-        var haveEnoughBarracks = Player.NumArchers > 0 && Player.NumKnights > 0;
+        var isEnemyClose = closestEnemyCreepDistance < 100;
 
         if (closestEmptySite != null) 
         {
-            if (isEnemyClose || haveEnoughBarracks)
+            if (isEnemyClose || HaveEnoughStructures)
             {
                 Console.WriteLine($"BUILD {closestEmptySite.Id} TOWER");
             }
             else 
             {
-                var type = Player.NumKnights == 0 ? "KNIGHT" : "ARCHER";
-                Console.WriteLine($"BUILD {closestEmptySite.Id} BARRACKS-{type}");
+                // Deciding which structure to build
+                var structure = "";
+                if (!HaveEnoughKnights) structure = "BARRACKS-KNIGHT";
+                else if (!HaveEnoughArchers) structure = "BARRACKS-ARCHER";
+                else if (!HaveEnoughMines) structure = "MINE";
+
+                Console.WriteLine($"BUILD {closestEmptySite.Id} {structure}");
             }
         }
         else 
@@ -248,6 +259,7 @@ class Unit : Piece {
 
 enum StructureTypeEnum {
     None = -1,
+    Mine = 0,
     Tower = 1,
     Barracks = 2
 }
