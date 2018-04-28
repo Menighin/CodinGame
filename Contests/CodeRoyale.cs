@@ -40,15 +40,14 @@ class Game
                 inputs = Console.ReadLine().Split(' ');
                 var site = Table.Sites[int.Parse(inputs[0])];
 
-                int param1 = int.Parse(inputs[1]); // used in future leagues
-                int param2 = int.Parse(inputs[2]); // used in future leagues
-
+                site.Gold          = int.Parse(inputs[1]); // used in future leagues
+                site.MaxRate       = int.Parse(inputs[2]); // used in future leagues
                 site.StructureType = (StructureTypeEnum) int.Parse(inputs[3]);
                 site.IsEnemy       = int.Parse(inputs[4]) == -1 ? (bool?)null : Convert.ToBoolean(int.Parse(inputs[4]));
                 site.NextSpawn     = int.Parse(inputs[5]);
                 site.CreepType     = (CreepTypeEnum) int.Parse(inputs[6]);
-                site.Param1        = param1;
-                site.Param2        = param2;
+                site.Param1        = int.Parse(inputs[5]);
+                site.Param2        = int.Parse(inputs[6]);
 
                 if (site.IsEnemy == null) Table.EmptySites.Add(site);
                 else if (site.IsEnemy == true) Table.EnemySites.Add(site);
@@ -120,12 +119,12 @@ static class Player
     public static int MustHaveArchers = 0;
     public static int MustHaveKnights = 1;
     public static int MustHaveMines = 1;
-    public static int MustHaveTowers = 2;
+    public static int MustHaveTowers = 4;
 
     public static bool HaveEnoughKnights    => NumKnights >= MustHaveKnights;
     public static bool HaveEnoughArchers    => NumArchers >= MustHaveArchers;
     public static bool HaveEnoughBarracks   => HaveEnoughArchers && HaveEnoughKnights;
-    public static bool HaveEnoughMines      => NumMines   >= MustHaveMines;
+    public static bool HaveEnoughMines      => Sites.Where(s => s.StructureType == StructureTypeEnum.Mine).Sum(s => s.Param1) >= TotalMineRate;
     public static bool HaveEnoughTowers     => NumTowers  >= MustHaveTowers;
     public static bool HaveEnoughStructures => HaveEnoughBarracks && HaveEnoughMines;
 
@@ -133,11 +132,13 @@ static class Player
 
     public static PlayerStateEnum PlayerState = PlayerStateEnum.BuildingBarrack;
 
-    public static int MaxMineRate    = 5;
-    public static int MaxTowerRadius = 50;
+    public static int TotalMineRate  = 5;
+    public static int MaxTowerRadius = 500;
 
     // <Id, value>
     public static Pair<int, int> IncrementalBuilding = null;
+
+    public static HashSet<int> HadMines = new HashSet<int>();
 
     public static bool HasEnoughGoldToTrain(CreepTypeEnum c) 
     {
@@ -157,6 +158,11 @@ static class Player
 
     public static void UpdateState() 
     {
+
+        // Update all mines
+        foreach(var m in Player.Sites.Where(s => s.StructureType == StructureTypeEnum.Mine).ToList())
+            Player.HadMines.Add(m.Id);
+
         switch(Player.PlayerState)
         {
             case PlayerStateEnum.BuildingBarrack:
@@ -164,14 +170,15 @@ static class Player
                     Player.PlayerState = PlayerStateEnum.BuildingMine;
                 break;
             case PlayerStateEnum.BuildingMine:
-                if (Player.IncrementalBuilding?.Value >= Player.MaxMineRate) 
+                if (Player.IncrementalBuilding?.Value >= Table.Sites[Player.IncrementalBuilding.Key].MaxRate) 
                 {
                     if (Player.HaveEnoughMines) Player.PlayerState = PlayerStateEnum.BuildingTower;
                     Player.IncrementalBuilding = null;
                 }
                 break;
             case PlayerStateEnum.BuildingTower:
-                if (Player.IncrementalBuilding?.Value >= Player.MaxTowerRadius)
+                var tower = Table.Sites[Player.IncrementalBuilding.Key];
+                if(tower.StructureType == StructureTypeEnum.Tower && tower.Param2 >= MaxTowerRadius)
                 {
                     if (Player.HaveEnoughTowers) Player.PlayerState = PlayerStateEnum.Running;
                     Player.IncrementalBuilding = null;
@@ -185,7 +192,7 @@ static class Player
 
         if (!HaveEmptySites) Player.PlayerState = PlayerStateEnum.Running;
 
-        Console.Error.WriteLine($"State {Player.PlayerState}");
+        // Console.Error.WriteLine($"State {Player.PlayerState}\n{Player.IncrementalBuilding}\n{Player.IncrementalBuilding != null ? Table.Sites[Player.IncrementalBuilding.Key].ToString() : ""}");
     }
 
     public static void MoveOrBuild() 
@@ -196,30 +203,41 @@ static class Player
         var closestEnemyCreepDistance = closestEnemyCreep == null ? (double?) null : Table.GetDistanceBetween(Player.Queen, closestEnemyCreep);
         var isEnemyClose = closestEnemyCreepDistance < 100;
 
-        switch (Player.PlayerState)
-        {
-            case PlayerStateEnum.BuildingBarrack:
-                if (!HaveEnoughKnights) Console.WriteLine($"BUILD {closestEmptySite.Id} BARRACKS-KNIGHT");
-                else if (!HaveEnoughArchers) Console.WriteLine($"BUILD {closestEmptySite.Id} BARRACKS-ARCHER");
-                break;
-            
-            case PlayerStateEnum.BuildingMine:
-                if (Player.IncrementalBuilding == null) Player.IncrementalBuilding = new Pair<int, int>(closestEmptySite.Id, 0);
-                Console.WriteLine($"BUILD {Player.IncrementalBuilding.Key} MINE");
-                Player.IncrementalBuilding.Value++;
-                break;
-            
-            case PlayerStateEnum.BuildingTower:
-                if (Player.IncrementalBuilding == null) Player.IncrementalBuilding = new Pair<int, int>(closestEmptySite.Id, 0);
-                Console.WriteLine($"BUILD {Player.IncrementalBuilding.Key} TOWER");
-                Player.IncrementalBuilding.Value++;
-                break;
+        try {
+            switch (Player.PlayerState)
+            {
+                case PlayerStateEnum.BuildingBarrack:
+                    if (!HaveEnoughKnights) Console.WriteLine($"BUILD {closestEmptySite.Id} BARRACKS-KNIGHT");
+                    else if (!HaveEnoughArchers) Console.WriteLine($"BUILD {closestEmptySite.Id} BARRACKS-ARCHER");
+                    break;
+                
+                case PlayerStateEnum.BuildingMine:
+                    var closestEmptySiteThatWasntAMine = Table.GetClosestPieceFrom(Player.Queen, Table.EmptySites.Where(s => !HadMines.Contains(s.Id)));
+                    
+                    if (Player.IncrementalBuilding == null) 
+                    {
+                        Player.IncrementalBuilding = new Pair<int, int>(closestEmptySiteThatWasntAMine.Id, 0);
+                    }
+                    Console.WriteLine($"BUILD {Player.IncrementalBuilding.Key} MINE");
+                    Player.IncrementalBuilding.Value++;
+                    break;
+                
+                case PlayerStateEnum.BuildingTower:
+                    if (Player.IncrementalBuilding == null) Player.IncrementalBuilding = new Pair<int, int>(closestEmptySite.Id, 0);
+                    Console.WriteLine($"BUILD {Player.IncrementalBuilding.Key} TOWER");
+                    Player.IncrementalBuilding.Value++;
+                    break;
 
-            case PlayerStateEnum.Running:
-                Console.WriteLine($"MOVE 0 0");
-                break;
-            default:
-                throw new Exception ("wat");
+                case PlayerStateEnum.Running:
+
+                    Console.WriteLine($"MOVE 0 0");
+                    break;
+                default:
+                    throw new Exception ("wat");
+            }
+        } catch {
+            Console.Error.WriteLine("ERRO");
+            Console.WriteLine($"MOVE 0 0");
         }
         
     }
@@ -227,21 +245,19 @@ static class Player
     public static void Train() 
     {
         var possibleTraining = Player.Sites.Where(s => s.NextSpawn == 0).ToList();
-        var creepType = default(CreepTypeEnum);
-        if (Player.TrainedKnights >= 3) {
-            possibleTraining = possibleTraining.Where(s => s.CreepType == CreepTypeEnum.Archer).ToList();
-            creepType = CreepTypeEnum.Archer;
-        } else {
-            possibleTraining = possibleTraining.Where(s => s.CreepType == CreepTypeEnum.Knight).ToList();
-            creepType = CreepTypeEnum.Knight;
-        }
+        var creepType = CreepTypeEnum.Knight;
+        // if (Player.TrainedKnights >= 3) {
+        //     possibleTraining = possibleTraining.Where(s => s.CreepType == CreepTypeEnum.Archer).ToList();
+        //     creepType = CreepTypeEnum.Archer;
+        // } else {
+        //     possibleTraining = possibleTraining.Where(s => s.CreepType == CreepTypeEnum.Knight).ToList();
+        //     creepType = CreepTypeEnum.Knight;
+        // }
 
         var trainingSite = Table.GetClosestPieceFrom(Table.EnemyQueen, possibleTraining);
 
         if (Player.HasEnoughGoldToTrain(creepType) && trainingSite != null) {
             Console.WriteLine($"TRAIN {trainingSite.Id}".Trim());
-            if (Player.TrainedKnights >= 3) Player.TrainedKnights = 0;
-            if (creepType == CreepTypeEnum.Knight) Player.TrainedKnights++;
         }
         else
             Console.WriteLine($"TRAIN");
@@ -308,8 +324,14 @@ class Site : Piece
     public int NextSpawn { get; set; }
     public bool? IsEnemy { get; set; }
     public CreepTypeEnum CreepType { get; set; }
-    public int Param1 { get; set; }
-    public int Param2 { get; set; }
+    public int Gold { get; set; }
+    public int MaxRate { get; set; }
+    public int Param1 {get;set;}
+    public int Param2 {get;set;}
+
+    public override string ToString() {
+        return $"[ Id = {Id} | Type = {StructureType} | Param1 = {Param1} | Param2 = {Param2}";
+    }
 }
 
 class Unit : Piece 
@@ -327,6 +349,10 @@ class Pair<T1, T2>
 
     public Pair(T1 key, T2 value) {
         Key = key; Value = value;
+    }
+
+    public override string ToString() {
+        return $"[ Key = {Key} | Value = {Value} ]";
     }
 }
 
