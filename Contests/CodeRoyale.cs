@@ -230,7 +230,16 @@ static class Player
 
                 case PlayerStateEnum.Running:
 
-                    Console.WriteLine($"MOVE 0 0");
+                    // Calculate safest spot
+                    var towers = Player.Sites.Where(s => s.StructureType == StructureTypeEnum.Tower).ToList();
+                    int x = 0, y = 0;
+                    foreach (var t in towers) {
+                        x += t.X;
+                        y += t.Y;
+                    }
+                    var pos = towers.Count > 0 ? $"{x / towers.Count} {y / towers.Count}" : "0 0";
+
+                    Console.WriteLine($"MOVE {pos}");
                     break;
                 default:
                     throw new Exception ("wat");
