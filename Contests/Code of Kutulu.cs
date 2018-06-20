@@ -51,8 +51,7 @@ class Player
                     Game.Player = new Explorer()
                     {
                         Id = id,
-                        X = x,
-                        Y = y,
+                        Position = new Point() { X = x, Y = y },
                         EntityType = EntityTypeEnum.Explorer,
                         Sanity = param0
                     };
@@ -61,8 +60,7 @@ class Player
                 {
                     Game.Explorers.Add(new Explorer() {
                         Id = id,
-                        X = x,
-                        Y = y,
+                        Position = new Point() { X = x, Y = y },
                         EntityType = EntityTypeEnum.Explorer,
                         Sanity = param0
                     });
@@ -71,8 +69,7 @@ class Player
                 {
                     Game.Wanderers.Add(new Wanderer() {
                         Id = id,
-                        X = x,
-                        Y = y,
+                        Position = new Point() { X = x, Y = y },
                         EntityType = EntityTypeEnum.Wanderer,
                         Time = param0,
                         Status = (WandererStatusEnum) param1,
@@ -81,10 +78,36 @@ class Player
                 }
             }
 
-            // Write an action using Console.WriteLine()
-            // To debug: Console.Error.WriteLine("Debug messages...");
+            // Get the closest wanderer to the player
+            var closestWanderer = Game.Player.GetClosestWanderer(Game.Wanderers);
+            var distToClosest = Double.MaxValue;
+            
+            if (closestWanderer != null) {
+                distToClosest = Game.GetDistanceBetween(Game.Player.Position, closestWanderer.Position);
+            }
 
-            Console.WriteLine("WAIT"); // MOVE <x> <y> | WAIT
+            if (distToClosest > 2) // If no wanderer is close, wait for death
+            {
+                Console.WriteLine("WAIT WAITING FOR FEAR TO FIND ME");
+            }
+            else // If there is a wanderer close enough, move away from it
+            {
+                // Get the valid positions
+                var validMovePositions = Game.GetValidMovePositionsAround(Game.Player.Position);
+
+                // Move to the one that gets the player farther from the wanderer
+                var position = Game.Player.Position;
+
+                foreach (var p in validMovePositions)
+                {
+                    var dist = Game.GetDistanceBetween(closestWanderer.Position, p);
+                    if (dist > distToClosest)
+                        position = p;
+                }
+
+                Console.WriteLine($"MOVE {position.X} {position.Y} GET AWAY FROM ME!");
+            }
+
         }
     }
 
@@ -98,19 +121,74 @@ class Player
         public static List<Explorer> Explorers;
         public static Explorer Player;
         public static List<Wanderer> Wanderers;
+
+        public static double GetDistanceBetween(Point p1, Point p2)
+        {
+            return Math.Sqrt(Math.Pow(p1.X - p2.X, 2) + Math.Pow(p1.Y - p2.Y, 2));
+        }
+
+        public static List<Point> GetValidMovePositionsAround(Point p)
+        {
+            var result = new List<Point>();
+
+            // Check up
+            if (p.Y > 0 && Map[p.Y - 1][p.X] != '#')
+                result.Add(new Point(){ X = p.X, Y = p.Y - 1});
+            
+            // Check down
+            if (p.Y < Height && Map[p.Y + 1][p.X] != '#')
+                result.Add(new Point(){ X = p.X, Y = p.Y + 1});
+
+            // Check left
+            if (p.X > 0 && Map[p.Y][p.X - 1] != '#')
+                result.Add(new Point(){ X = p.X - 1, Y = p.Y});
+
+            // Check right
+            if (p.X < Width && Map[p.Y][p.X + 1] != '#')
+                result.Add(new Point(){ X = p.X + 1, Y = p.Y});
+
+            return result;
+        }
+    }
+
+    class Point 
+    {
+        public int X { get; set; }
+        public int Y { get; set; }
+
+        public override string ToString() 
+        {
+            return $"({X}, {Y})";
+        }
     }
 
     abstract class Entity 
     {
         public int Id { get; set; }
-        public int X { get; set; }
-        public int Y { get; set; }
+        public Point Position { get; set; }
         public EntityTypeEnum EntityType { get; set; }
     }
 
     class Explorer : Entity
     {
         public int Sanity { get; set; }
+
+        public Wanderer GetClosestWanderer(List<Wanderer> wanderers)
+        {
+            var minDist = Double.MaxValue;
+            Wanderer wanderer = null;
+            foreach (var w in wanderers)
+            {
+                var dist = Game.GetDistanceBetween(this.Position, w.Position);
+                if (dist < minDist)
+                {
+                    minDist = dist;
+                    wanderer = w;
+                }
+            }
+
+            return wanderer;
+        }
     }
 
     class Wanderer : Entity
