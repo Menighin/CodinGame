@@ -205,6 +205,11 @@ class Player
 
         public static EntityTypeEnum Explorer = new EntityTypeEnum("Explorer");
         public static EntityTypeEnum Wanderer = new EntityTypeEnum("Wanderer");
+        public static EntityTypeEnum Slasher = new EntityTypeEnum("Slasher");
+        public static EntityTypeEnum EffectPlan  = new EntityTypeEnum("Effect_Plan");
+        public static EntityTypeEnum EffectLight = new EntityTypeEnum("Effect_Light");
+        public static EntityTypeEnum EffectShelter = new EntityTypeEnum("Effect_Shelter");
+        public static EntityTypeEnum EffectYell = new EntityTypeEnum("Effect_Yell");
 
         public string Value { get; set; }
 
