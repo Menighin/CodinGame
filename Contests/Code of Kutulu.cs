@@ -76,6 +76,17 @@ class Player
                         Target = param2
                     });
                 }
+                else if (entityType == EntityTypeEnum.Slasher)
+                {
+                    Game.Slashers.Add(new Slasher() {
+                        Id = id,
+                        Position = new Point() { X = x, Y = y },
+                        EntityType = EntityTypeEnum.Wanderer,
+                        Time = param0,
+                        Status = (WandererStatusEnum) param1,
+                        Target = param2
+                    });
+                }
             }
 
             // Get the closest wanderer to the player
@@ -111,7 +122,6 @@ class Player
         }
     }
 
-
     static class Game
     {
         public static int Width;
@@ -121,6 +131,7 @@ class Player
         public static List<Explorer> Explorers;
         public static Explorer Player;
         public static List<Wanderer> Wanderers;
+        public static List<Slasher> Slashers;
 
         public static double GetDistanceBetween(Point p1, Point p2)
         {
@@ -193,11 +204,18 @@ class Player
 
     class Wanderer : Entity
     {
-        public int Sanity { get; set; }
         public WandererStatusEnum Status { get; set; }
         public int Time { get; set; }
         public int Target { get; set; }
     }
+
+    class Slasher : Entity
+    {
+        public WandererStatusEnum Status { get; set; }
+        public int Time { get; set; }
+        public int Target { get; set; }
+    }
+
 
     class EntityTypeEnum 
     {
@@ -250,7 +268,10 @@ class Player
     enum WandererStatusEnum
     {
         Spawning = 0,
-        Wandering = 1
+        Wandering = 1,
+        Stalking = 2,
+        Rushing = 3,
+        Sunned = 4
     }
 
 }
