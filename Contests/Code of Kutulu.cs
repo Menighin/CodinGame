@@ -32,7 +32,7 @@ class Player
         {
 
             Game.Explorers = new List<Explorer>();
-            Game.Wanderers = new List<Wanderer>();
+            Game.Minions   = new List<Minion>();
 
             int entityCount = int.Parse(Console.ReadLine()); // the first given entity corresponds to your explorer
             for (int i = 0; i < entityCount; i++)
@@ -67,7 +67,7 @@ class Player
                 }
                 else if (entityType == EntityTypeEnum.Wanderer)
                 {
-                    Game.Wanderers.Add(new Wanderer() {
+                    Game.Minions.Add(new Wanderer() {
                         Id = id,
                         Position = new Point() { X = x, Y = y },
                         EntityType = EntityTypeEnum.Wanderer,
@@ -78,7 +78,7 @@ class Player
                 }
                 else if (entityType == EntityTypeEnum.Slasher)
                 {
-                    Game.Slashers.Add(new Slasher() {
+                    Game.Minions.Add(new Slasher() {
                         Id = id,
                         Position = new Point() { X = x, Y = y },
                         EntityType = EntityTypeEnum.Wanderer,
@@ -90,11 +90,11 @@ class Player
             }
 
             // Get the closest wanderer to the player
-            var closestWanderer = Game.Player.GetClosestWanderer(Game.Wanderers);
+            var closestMinion = Game.Player.GetClosestMinion(Game.Minions);
             var distToClosest = Double.MaxValue;
             
-            if (closestWanderer != null) {
-                distToClosest = Game.GetDistanceBetween(Game.Player.Position, closestWanderer.Position);
+            if (closestMinion != null) {
+                distToClosest = Game.GetDistanceBetween(Game.Player.Position, closestMinion.Position);
             }
 
             if (Game.Player.Sanity < 100 && Game.PlansLeft > 0)
@@ -103,11 +103,11 @@ class Player
             }
             else 
             {
-                if (distToClosest > 2) // If no wanderer is close, wait for death
+                if (distToClosest > 2) // If no minion is close, wait for death
                 {
                     Console.WriteLine("WAIT WAITING FOR FEAR TO FIND ME");
                 }
-                else // If there is a wanderer close enough, move away from it
+                else // If there is a minion close enough, move away from it
                 {
                     // Get the valid positions
                     var validMovePositions = Game.GetValidMovePositionsAround(Game.Player.Position);
@@ -117,7 +117,7 @@ class Player
 
                     foreach (var p in validMovePositions)
                     {
-                        var dist = Game.GetDistanceBetween(closestWanderer.Position, p);
+                        var dist = Game.GetDistanceBetween(closestMinion.Position, p);
                         if (dist > distToClosest)
                             position = p;
                     }
@@ -138,8 +138,7 @@ class Player
 
         public static List<Explorer> Explorers;
         public static Explorer Player;
-        public static List<Wanderer> Wanderers;
-        public static List<Slasher> Slashers;
+        public static List<Minion> Minions;
 
         public static double GetDistanceBetween(Point p1, Point p2)
         {
@@ -192,36 +191,39 @@ class Player
     {
         public int Sanity { get; set; }
 
-        public Wanderer GetClosestWanderer(List<Wanderer> wanderers)
+        public Minion GetClosestMinion(List<Minion> minions)
         {
             var minDist = Double.MaxValue;
-            Wanderer wanderer = null;
-            foreach (var w in wanderers)
+            Minion minion = null;
+            foreach (var w in minions)
             {
                 var dist = Game.GetDistanceBetween(this.Position, w.Position);
                 if (dist < minDist)
                 {
                     minDist = dist;
-                    wanderer = w;
+                    minion = w;
                 }
             }
 
-            return wanderer;
+            return minion;
         }
     }
 
-    class Wanderer : Entity
+    class Minion : Entity
     {
         public WandererStatusEnum Status { get; set; }
         public int Time { get; set; }
         public int Target { get; set; }
     }
 
-    class Slasher : Entity
+    class Wanderer : Minion
     {
-        public WandererStatusEnum Status { get; set; }
-        public int Time { get; set; }
-        public int Target { get; set; }
+        
+    }
+
+    class Slasher : Minion
+    {
+
     }
 
 
