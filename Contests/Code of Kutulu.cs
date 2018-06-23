@@ -97,33 +97,41 @@ class Player
                 distToClosest = Game.GetDistanceBetween(Game.Player.Position, closestWanderer.Position);
             }
 
-            if (distToClosest > 2) // If no wanderer is close, wait for death
+            if (Game.Player.Sanity < 100 && Game.PlansLeft > 0)
             {
-                Console.WriteLine("WAIT WAITING FOR FEAR TO FIND ME");
+                Console.WriteLine("PLAN");
             }
-            else // If there is a wanderer close enough, move away from it
+            else 
             {
-                // Get the valid positions
-                var validMovePositions = Game.GetValidMovePositionsAround(Game.Player.Position);
-
-                // Move to the one that gets the player farther from the wanderer
-                var position = Game.Player.Position;
-
-                foreach (var p in validMovePositions)
+                if (distToClosest > 2) // If no wanderer is close, wait for death
                 {
-                    var dist = Game.GetDistanceBetween(closestWanderer.Position, p);
-                    if (dist > distToClosest)
-                        position = p;
+                    Console.WriteLine("WAIT WAITING FOR FEAR TO FIND ME");
                 }
+                else // If there is a wanderer close enough, move away from it
+                {
+                    // Get the valid positions
+                    var validMovePositions = Game.GetValidMovePositionsAround(Game.Player.Position);
 
-                Console.WriteLine($"MOVE {position.X} {position.Y} GET AWAY FROM ME!");
+                    // Move to the one that gets the player farther from the wanderer
+                    var position = Game.Player.Position;
+
+                    foreach (var p in validMovePositions)
+                    {
+                        var dist = Game.GetDistanceBetween(closestWanderer.Position, p);
+                        if (dist > distToClosest)
+                            position = p;
+                    }
+
+                    Console.WriteLine($"MOVE {position.X} {position.Y} GET AWAY FROM ME!");
+                }
             }
-
         }
     }
 
     static class Game
     {
+        public static int PlansLeft = 2;
+
         public static int Width;
         public static int Height;
         public static List<string> Map = new List<string>();
