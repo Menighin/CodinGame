@@ -89,13 +89,7 @@ class Player
                 }
             }
 
-            // Get the closest wanderer to the player
-            var closestMinion = Game.Player.GetClosestMinion(Game.Minions);
-            var distToClosest = Double.MaxValue;
             
-            if (closestMinion != null) {
-                distToClosest = Game.GetDistanceBetween(Game.Player.Position, closestMinion.Position);
-            }
 
             if (Game.Player.Sanity < 100 && Game.PlansLeft > 0)
             {
@@ -103,6 +97,14 @@ class Player
             }
             else 
             {
+                // Get the closest wanderer to the player
+                var closestMinion = Game.Player.GetClosestMinion(Game.Minions);
+                var distToClosest = Double.MaxValue;
+                
+                if (closestMinion != null) {
+                    distToClosest = Game.GetDistanceBetween(Game.Player.Position, closestMinion.Position);
+                }
+
                 if (distToClosest > 2) // If no minion is close, wait for death
                 {
                     Console.WriteLine("WAIT WAITING FOR FEAR TO FIND ME");
