@@ -76,14 +76,64 @@ class LegendsOfCodeAndMagic
         public static GamePhaseEnum GamePhase;
         public static int Turn;
 
+        private static PickDraftStateEnum PickState {
+            get {
+                if (Turn < CardsByState[PickDraftStateEnum.PickingCheap])
+                    return PickDraftStateEnum.PickingCheap;
+                if (Turn < CardsByState[PickDraftStateEnum.PickingGuard])
+                    return PickDraftStateEnum.PickingGuard;
+                if (Turn < CardsByState[PickDraftStateEnum.PickingStrong])
+                    return PickDraftStateEnum.PickingStrong;
+                return PickDraftStateEnum.PickingEquipment;
+            }
+        } 
+
+        private static Dictionary<PickDraftStateEnum, int> CardsByState = new Dictionary<PickDraftStateEnum, int>() 
+        {
+            {PickDraftStateEnum.PickingCheap, 12},
+            {PickDraftStateEnum.PickingGuard, 20},
+            {PickDraftStateEnum.PickingStrong, 27},
+            {PickDraftStateEnum.PickingEquipment, 30},
+        };
+
         public static void PickDraft(List<Card> cards) 
         {
-            var cardsByCost = Me.Deck
-                .GroupBy(g => g.Cost)
-                .ToDictionary(k => k.Key, v => v.ToList());
-                
+            for(var i = 0; i < cards.Count; i++)
+                cards[i].InstanceId = i;
 
-            Console.WriteLine("PASS");
+            var creatures = cards.Where(o => o.CardType == CardTypeEnum.Creature).ToList();
+            var items = cards.Where(o => o.CardType != CardTypeEnum.Creature).ToList();
+            
+            switch(PickState) {
+                case PickDraftStateEnum.PickingCheap:
+                    
+                    var bestCheapestCard = creatures.OrderBy(o => o.Cost).ThenByDescending(o => o.Attack).FirstOrDefault()
+                        ?? items.FirstOrDefault();
+                    Console.WriteLine($"PICK {bestCheapestCard.InstanceId}");
+
+                    break;
+                case PickDraftStateEnum.PickingGuard:
+
+                    var guards = creatures.Where(o => o.Abilities.Contains(AbilitiesEnum.Guard)).FirstOrDefault() ??
+                                 creatures.OrderBy(o => o.Cost).ThenByDescending(o => o.Attack).FirstOrDefault() ??
+                                 items.FirstOrDefault();
+                    Console.WriteLine($"PICK {guards.InstanceId}");
+
+                    break;
+                case PickDraftStateEnum.PickingStrong:
+
+                    var bestStrongestCard = creatures.OrderByDescending(o => o.Attack).ThenBy(o => o.Cost).FirstOrDefault() ?? items.First();
+                    Console.WriteLine($"PICK {bestStrongestCard.InstanceId}");
+
+                    break;
+                case PickDraftStateEnum.PickingEquipment:
+                    
+                    var itemCard = items.FirstOrDefault() ?? creatures.OrderBy(o => o.Cost).ThenByDescending(o => o.Attack).FirstOrDefault();
+                    Console.WriteLine($"PICK {itemCard.InstanceId}");
+
+                    break;
+            }
+
         }
 
         public static void MakeMove(List<Card> cards)
@@ -93,13 +143,22 @@ class LegendsOfCodeAndMagic
             var opponentField = cards.Where(o => o.Location == LocationEnum.OpponentsSide).ToList();
             var opponentGuards = opponentField.Where(o => o.Abilities.Contains(AbilitiesEnum.Guard));
 
-            var moves = new List<string>();
+            var isGuarded = myField.Where(o => o.Abilities.Contains(AbilitiesEnum.Guard)).Any();
 
+            var moves = new List<string>();
+            
+            // Define which card to summon
             if (myField.Count < 5 && hand.Count > 0) 
             {
-                var bestCardToDraw = hand.Where(o => o.Cost <= Me.Mana).OrderByDescending(o => o.Attack).FirstOrDefault();
-                if (bestCardToDraw != null)
-                    moves.Add($"SUMMON {bestCardToDraw.InstanceId}");
+                Card cardToDrawn = null;
+                if (!isGuarded)
+                    cardToDrawn = hand.Where(o => o.Abilities.Contains(AbilitiesEnum.Guard) && o.Cost <= Me.Mana).OrderByDescending(o => o.Defense).FirstOrDefault()
+                    
+                if (cardToDrawn == null)
+                    cardToDrawn = hand.Where(o => o.Cost <= Me.Mana).OrderByDescending(o => o.Attack).FirstOrDefault();
+
+                if (cardToDrawn != null)
+                    moves.Add($"SUMMON {cardToDrawn.InstanceId}");
             }
 
             // Define one attack per card in field
@@ -160,6 +219,9 @@ class LegendsOfCodeAndMagic
     enum CardTypeEnum
     {
         Creature = 0,
+        GreenItem = 1,
+        RedItem = 2,
+        BlueItem = 3
     }
 
     enum LocationEnum
@@ -179,6 +241,17 @@ class LegendsOfCodeAndMagic
     {
         Breakthrough = 'B',
         Guard = 'G',
-        Charge = 'C'
+        Charge = 'C',
+        Drain = 'D',
+        Lethal = 'L',
+        Ward = 'W'
+    }
+
+    enum PickDraftStateEnum
+    {
+        PickingCheap = 0,
+        PickingGuard = 1,
+        PickingStrong = 2,
+        PickingEquipment = 3
     }
 }
