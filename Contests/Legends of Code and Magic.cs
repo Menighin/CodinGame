@@ -46,7 +46,7 @@ class LegendsOfCodeAndMagic
                     Cost = int.Parse(inputs[4]),
                     Attack = int.Parse(inputs[5]),
                     Defense = int.Parse(inputs[6]),
-                    Abilities = inputs[7],
+                    Abilities = new HashSet<AbilitiesEnum>(inputs[7].Where(o => o != '-').Select(o => (AbilitiesEnum) o).ToList()),
                     MyHealthChange = int.Parse(inputs[8]),
                     OpponentHealthChange = int.Parse(inputs[9]),
                     CardDraw = int.Parse(inputs[10])
@@ -78,28 +78,41 @@ class LegendsOfCodeAndMagic
 
         public static void PickDraft(List<Card> cards) 
         {
+            var cardsByCost = Me.Deck
+                .GroupBy(g => g.Cost)
+                .ToDictionary(k => k.Key, v => v.ToList());
+                
+
             Console.WriteLine("PASS");
         }
 
         public static void MakeMove(List<Card> cards)
         {
-            // Console.WriteLine("PASS");
             var hand = cards.Where(o => o.Location == LocationEnum.PlayersHand).ToList();
-            var myField = cards.Where(o => o.Location == LocationEnum.PlayersSide).ToList();
+            var myField = cards.Where(o => o.Location == LocationEnum.PlayersSide).OrderByDescending(o => o.Attack).ToList();
             var opponentField = cards.Where(o => o.Location == LocationEnum.OpponentsSide).ToList();
+            var opponentGuards = opponentField.Where(o => o.Abilities.Contains(AbilitiesEnum.Guard));
 
             var moves = new List<string>();
 
             if (myField.Count < 5 && hand.Count > 0) 
             {
-                var bestCardToDraw = hand.Where(o => o.Cost <= Me.Mana).FirstOrDefault();
+                var bestCardToDraw = hand.Where(o => o.Cost <= Me.Mana).OrderByDescending(o => o.Attack).FirstOrDefault();
                 if (bestCardToDraw != null)
                     moves.Add($"SUMMON {bestCardToDraw.InstanceId}");
             }
 
             // Define one attack per card in field
-            foreach(var card in myField) {
-                moves.Add($"ATTACK {card.InstanceId} -1");
+            foreach(var card in myField) 
+            {
+                if (!opponentGuards.Any())
+                {
+                    moves.Add($"ATTACK {card.InstanceId} -1");
+                }
+                else 
+                {
+                    moves.Add($"ATTACK {card.InstanceId} {opponentGuards.First().InstanceId}");
+                }
             }
 
             Console.WriteLine(string.Join(";", moves));
@@ -137,7 +150,7 @@ class LegendsOfCodeAndMagic
         public int Cost { get; set; }
         public int Attack { get; set; }
         public int Defense { get; set; }
-        public string Abilities { get; set; }
+        public HashSet<AbilitiesEnum> Abilities { get; set; }
         public int MyHealthChange { get; set; }
         public int OpponentHealthChange { get; set; }
         public int CardDraw { get; set; }
@@ -160,5 +173,12 @@ class LegendsOfCodeAndMagic
     {
         DraftPhase = 0,
         BattlePhase = 1
+    }
+
+    enum AbilitiesEnum
+    {
+        Breakthrough = 'B',
+        Guard = 'G',
+        Charge = 'C'
     }
 }
