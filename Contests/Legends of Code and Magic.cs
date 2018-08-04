@@ -96,11 +96,24 @@ class LegendsOfCodeAndMagic
             {PickDraftStateEnum.PickingEquipment, 30},
         };
 
+        private static HashSet<int> BestCardsToPick = new HashSet<int>()
+        {
+            // Green Item
+            118, // Give +3 Armor, costs 0
+
+            // Red Item
+            141, // Give stats -1/-1, costs 0
+            142, // Remove all abilities, cost 0
+            143, // Remove guard, cost 0
+        };
 
         public static void PickDraft(List<Card> cards) 
         {
             for(var i = 0; i < cards.Count; i++)
                 cards[i].InstanceId = i;
+            
+            Func<Card, bool> allTimeBestItem = (c) => BestCardsToPick.Contains(c.CardNumber);
+            Func<Card, bool> alltimeBestCard = (c) => (c.Cost <= 5 && (c.Abilities.Contains(AbilitiesEnum.Guard) || c.Abilities.Contains(AbilitiesEnum.Lethal)));
 
             var creatures = cards.Where(o => o.CardType == CardTypeEnum.Creature).ToList();
             var items = cards.Where(o => o.CardType != CardTypeEnum.Creature).ToList();
@@ -108,28 +121,38 @@ class LegendsOfCodeAndMagic
             switch(PickState) {
                 case PickDraftStateEnum.PickingCheap:
                     
-                    var bestCheapestCard = creatures.OrderBy(o => o.Cost).ThenByDescending(o => o.Attack).FirstOrDefault()
+                    var bestCheapestCard = items.Where(allTimeBestItem).FirstOrDefault()
+                        ?? creatures.Where(alltimeBestCard).FirstOrDefault()
+                        ?? creatures.OrderBy(o => o.Cost).ThenByDescending(o => o.Attack).FirstOrDefault()
                         ?? items.FirstOrDefault();
                     Console.WriteLine($"PICK {bestCheapestCard.InstanceId}");
 
                     break;
                 case PickDraftStateEnum.PickingGuard:
 
-                    var guards = creatures.Where(o => o.Abilities.Contains(AbilitiesEnum.Guard)).OrderByDescending(o => o.Defense).FirstOrDefault() ??
-                                 creatures.OrderBy(o => o.Cost).ThenByDescending(o => o.Attack).FirstOrDefault() ??
-                                 items.FirstOrDefault();
+                    var guards = items.Where(allTimeBestItem).FirstOrDefault()
+                        ?? creatures.Where(alltimeBestCard).FirstOrDefault() 
+                        ?? creatures.Where(o => o.Abilities.Contains(AbilitiesEnum.Guard)).OrderByDescending(o => o.Defense).FirstOrDefault()
+                        ?? creatures.OrderBy(o => o.Cost).ThenByDescending(o => o.Attack).FirstOrDefault()
+                        ?? items.FirstOrDefault();
+
                     Console.WriteLine($"PICK {guards.InstanceId}");
 
                     break;
                 case PickDraftStateEnum.PickingStrong:
 
-                    var bestStrongestCard = creatures.OrderByDescending(o => o.Attack).ThenBy(o => o.Cost).FirstOrDefault() ?? items.First();
+                    var bestStrongestCard = items.Where(allTimeBestItem).FirstOrDefault()
+                        ?? creatures.Where(alltimeBestCard).FirstOrDefault() 
+                        ?? creatures.OrderByDescending(o => o.Attack).ThenBy(o => o.Cost).FirstOrDefault() ?? items.First();
+
                     Console.WriteLine($"PICK {bestStrongestCard.InstanceId}");
 
                     break;
                 case PickDraftStateEnum.PickingEquipment:
                     
-                    var itemCard = items.FirstOrDefault() ?? creatures.OrderBy(o => o.Cost).ThenByDescending(o => o.Attack).FirstOrDefault();
+                    var itemCard = items.Where(allTimeBestItem).FirstOrDefault()
+                        ?? creatures.Where(alltimeBestCard).FirstOrDefault()
+                        ?? items.FirstOrDefault() ?? creatures.OrderBy(o => o.Cost).ThenByDescending(o => o.Attack).FirstOrDefault();
                     Console.WriteLine($"PICK {itemCard.InstanceId}");
 
                     break;
@@ -143,16 +166,40 @@ class LegendsOfCodeAndMagic
             var handItems = cards.Where(o => o.Location == LocationEnum.PlayersHand && o.CardType != CardTypeEnum.Creature && o.Cost <= Me.Mana).ToList();
             var myField = cards.Where(o => o.Location == LocationEnum.PlayersSide).OrderByDescending(o => o.Attack).ToList();
             var opponentField = cards.Where(o => o.Location == LocationEnum.OpponentsSide).ToList();
-            var opponentGuards = opponentField.Where(o => o.Abilities.Contains(AbilitiesEnum.Guard));
+            var opponentGuards = opponentField.Where(o => o.Abilities.Contains(AbilitiesEnum.Guard)).ToList();
 
-            var isGuarded = myField.Where(o => o.Abilities.Contains(AbilitiesEnum.Guard)).Count() >= 2;
+            var myGuards = myField.Where(o => o.Abilities.Contains(AbilitiesEnum.Guard)).OrderByDescending(o => o.Defense).ToList();
+
+            var isGuarded = myGuards.Count() >= 2;
 
             var moves = new List<string>();
             
             // Define item to use
             if (handItems.Any()) 
             {
-                var itemToUse = handItems.FirstOrDefault();
+                var handItemsNos = new HashSet<int>(handItems.Select(o => o.CardNumber).ToList());
+                var usedItems = new HashSet<int>();
+
+                // Buff my guard
+                if (handItemsNos.Contains(118) && isGuarded) 
+                {
+                    var itemCard = handItems.Where(o => o.CardNumber == 118).First();
+                    moves.Add($"USE {itemCard.InstanceId} {myGuards.First().InstanceId}");
+                    usedItems.Add(itemCard.InstanceId);
+                }
+
+                // Remove guard abilities from enemy
+                if (opponentGuards.Any() && (handItemsNos.Contains(142) || handItemsNos.Contains(143)))
+                {
+                    var itemCard = handItems.Where(o => o.CardNumber == 142 || o.CardNumber == 143).FirstOrDefault();
+                    var enemyGuard = opponentGuards.FirstOrDefault();
+                    moves.Add($"USE {itemCard.InstanceId} {enemyGuard.InstanceId}");
+
+                    opponentGuards = opponentGuards.Where(o => o.InstanceId != enemyGuard.InstanceId).ToList();
+                    usedItems.Add(itemCard.InstanceId);
+                }
+
+                var itemToUse = handItems.Where(o => !usedItems.Contains(o.InstanceId)).FirstOrDefault();
                 if (itemToUse != null) {
                     if (itemToUse.CardType == CardTypeEnum.BlueItem)
                         moves.Add($"USE {itemToUse.InstanceId} -1");
@@ -163,6 +210,9 @@ class LegendsOfCodeAndMagic
                     else if (itemToUse.CardType == CardTypeEnum.RedItem && myField.Any())
                         moves.Add($"USE {itemToUse.InstanceId} {myField.First().InstanceId}");
                 }
+
+                
+
             }
 
             // Define which card to summon
