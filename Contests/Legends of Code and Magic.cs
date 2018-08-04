@@ -90,11 +90,12 @@ class LegendsOfCodeAndMagic
 
         private static Dictionary<PickDraftStateEnum, int> CardsByState = new Dictionary<PickDraftStateEnum, int>() 
         {
-            {PickDraftStateEnum.PickingCheap, 12},
-            {PickDraftStateEnum.PickingGuard, 20},
-            {PickDraftStateEnum.PickingStrong, 27},
+            {PickDraftStateEnum.PickingCheap, 5},
+            {PickDraftStateEnum.PickingGuard, 15},
+            {PickDraftStateEnum.PickingStrong, 25},
             {PickDraftStateEnum.PickingEquipment, 30},
         };
+
 
         public static void PickDraft(List<Card> cards) 
         {
@@ -114,7 +115,7 @@ class LegendsOfCodeAndMagic
                     break;
                 case PickDraftStateEnum.PickingGuard:
 
-                    var guards = creatures.Where(o => o.Abilities.Contains(AbilitiesEnum.Guard)).FirstOrDefault() ??
+                    var guards = creatures.Where(o => o.Abilities.Contains(AbilitiesEnum.Guard)).OrderByDescending(o => o.Defense).FirstOrDefault() ??
                                  creatures.OrderBy(o => o.Cost).ThenByDescending(o => o.Attack).FirstOrDefault() ??
                                  items.FirstOrDefault();
                     Console.WriteLine($"PICK {guards.InstanceId}");
@@ -138,39 +139,72 @@ class LegendsOfCodeAndMagic
 
         public static void MakeMove(List<Card> cards)
         {
-            var hand = cards.Where(o => o.Location == LocationEnum.PlayersHand).ToList();
+            var handCreatures = cards.Where(o => o.Location == LocationEnum.PlayersHand && o.CardType == CardTypeEnum.Creature && o.Cost <= Me.Mana).ToList();
+            var handItems = cards.Where(o => o.Location == LocationEnum.PlayersHand && o.CardType != CardTypeEnum.Creature && o.Cost <= Me.Mana).ToList();
             var myField = cards.Where(o => o.Location == LocationEnum.PlayersSide).OrderByDescending(o => o.Attack).ToList();
             var opponentField = cards.Where(o => o.Location == LocationEnum.OpponentsSide).ToList();
             var opponentGuards = opponentField.Where(o => o.Abilities.Contains(AbilitiesEnum.Guard));
 
-            var isGuarded = myField.Where(o => o.Abilities.Contains(AbilitiesEnum.Guard)).Any();
+            var isGuarded = myField.Where(o => o.Abilities.Contains(AbilitiesEnum.Guard)).Count() >= 2;
 
             var moves = new List<string>();
             
+            // Define item to use
+            if (handItems.Any()) 
+            {
+                var itemToUse = handItems.FirstOrDefault();
+                if (itemToUse != null) {
+                    if (itemToUse.CardType == CardTypeEnum.BlueItem)
+                        moves.Add($"USE {itemToUse.InstanceId} -1");
+
+                    else if (itemToUse.CardType == CardTypeEnum.RedItem && opponentField.Any())
+                        moves.Add($"USE {itemToUse.InstanceId} {opponentField.First().InstanceId}");
+
+                    else if (itemToUse.CardType == CardTypeEnum.RedItem && myField.Any())
+                        moves.Add($"USE {itemToUse.InstanceId} {myField.First().InstanceId}");
+                }
+            }
+
             // Define which card to summon
-            if (myField.Count < 5 && hand.Count > 0) 
+            if (myField.Count < 5 && handCreatures.Count > 0) 
             {
                 Card cardToDrawn = null;
                 if (!isGuarded)
-                    cardToDrawn = hand.Where(o => o.Abilities.Contains(AbilitiesEnum.Guard) && o.Cost <= Me.Mana).OrderByDescending(o => o.Defense).FirstOrDefault()
-                    
+                    cardToDrawn = handCreatures.Where(o => o.Abilities.Contains(AbilitiesEnum.Guard)).OrderByDescending(o => o.Defense).FirstOrDefault();
+
                 if (cardToDrawn == null)
-                    cardToDrawn = hand.Where(o => o.Cost <= Me.Mana).OrderByDescending(o => o.Attack).FirstOrDefault();
+                    cardToDrawn = handCreatures.OrderByDescending(o => o.Attack).FirstOrDefault();
 
                 if (cardToDrawn != null)
                     moves.Add($"SUMMON {cardToDrawn.InstanceId}");
             }
 
             // Define one attack per card in field
-            foreach(var card in myField) 
+            foreach(var myCard in myField) 
             {
+                if (myCard.Attack == 0) continue;
+
+                // Attack player directly
                 if (!opponentGuards.Any())
                 {
-                    moves.Add($"ATTACK {card.InstanceId} -1");
+                    moves.Add($"ATTACK {myCard.InstanceId} -1");
                 }
+                // Attack the guardian it can
                 else 
                 {
-                    moves.Add($"ATTACK {card.InstanceId} {opponentGuards.First().InstanceId}");
+                    Card bestGuardToAttack = null;
+                    
+                    // Guards it can kill
+                    bestGuardToAttack = opponentGuards.Where(o => o.Defense <= myCard.Attack).FirstOrDefault();
+
+                    // Or guards that don't kill me back
+                    if (bestGuardToAttack == null)
+                        bestGuardToAttack = opponentGuards.Where(o => o.Attack < myCard.Defense).FirstOrDefault();
+
+                    if (bestGuardToAttack != null)
+                        moves.Add($"ATTACK {myCard.InstanceId} {opponentGuards.First().InstanceId}");
+                    else 
+                        moves.Add($"ATTACK {myCard.InstanceId} -1");
                 }
             }
 
