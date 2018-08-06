@@ -338,4 +338,10 @@ class LegendsOfCodeAndMagic
         PickingStrong = 2,
         PickingEquipment = 3
     }
+
+    enum PlayerStateEnum
+    {
+        PlayAnyCard = 0,
+        PlayStrongCard = 1,
+    }
 }
