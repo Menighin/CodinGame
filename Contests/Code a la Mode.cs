@@ -13,20 +13,26 @@ public enum ItemEnum
 	ICE_CREAM = 4,
 	BLUEBERRIES = 8,
 	STRAWBERRIES = 16,
-	CHOPPED_STRAWBERRIES = 32
+	CHOPPED_STRAWBERRIES = 32,
+	DOUGH = 64,
+	CROISSANT = 128
 }
 
 [Flags]
 public enum StateEnum
 {
 	WAITING,
-	GETTING_DISH,
-	GETTING_ICE_CREAM,
-	GETTING_BLUEBERRIES,
-	GETTING_STRAWBERRIES,
+	PICKING_DISH,
+	PICKING_ICE_CREAM,
+	PICKING_BLUEBERRIES,
+	PICKING_STRAWBERRIES,
 	CHOPPING_STRAWBERRIES,
 	LEAVING_CHOPPED_STRAWBERRIES,
-	GETTING_CHOPPED_STRAWBERRIES,
+	GETTING_DOUGH,
+	BAKING_DOUGH,
+	PICKING_FROM_OVEN,
+	LEAVING_CROISSANT,
+	PICKING_CROISSANT,
 	DELIVERING
 }
 
@@ -119,20 +125,22 @@ public class ClientOrder
 
 public class Game
 {
-	public int MyStateIndex { get; set; }
+	public StateEnum CurrentState { get; set; }
 	public Player Me { get; set; }
 	public Player Partner { get; set; }
 	public Table Dishwasher { get; set; }
 	public Table ChoppingTable { get; set; }
+	public Table Oven { get; set; }
 	public Table Window { get; set; }
 	public Table IceCream { get; set; }
 	public Table Blueberry { get; set; }
 	public Table Strawberries { get; set; }
+	public Table Dough { get; set; }
 	public List<Table> Tables { get; set; }
 	public List<ClientOrder> ClientOrders { get; set; }
 	public ClientOrder PreparingOrder { get; set; }
 	public int TurnsRemaining { get; set; }
-	public List<StateEnum> StatesSequence { get; set; }
+	public Stack<StateEnum> StatesStack { get; set; }
 
 	public Game()
 	{
@@ -149,44 +157,42 @@ public class Game
 
 	public string DoSomething()
 	{
-		var myState = StatesSequence[MyStateIndex];
-
-		if (myState == StateEnum.GETTING_DISH)
+		if (CurrentState == StateEnum.PICKING_DISH)
 		{
 			if (Me.CanUseTable(Dishwasher))
-				return $"USE {Dishwasher.Position}; {myState}";
+				return $"USE {Dishwasher.Position}; {CurrentState}";
 			else 
-				return $"MOVE {Dishwasher.Position}; {myState}";
+				return $"MOVE {Dishwasher.Position}; {CurrentState}";
 		}
-		else if (myState == StateEnum.GETTING_BLUEBERRIES)
+		else if (CurrentState == StateEnum.PICKING_BLUEBERRIES)
 		{
 			if (Me.CanUseTable(Blueberry))
-				return $"USE {Blueberry.Position}; {myState}";
+				return $"USE {Blueberry.Position}; {CurrentState}";
 			else 
-				return $"MOVE {Blueberry.Position}; {myState}";
+				return $"MOVE {Blueberry.Position}; {CurrentState}";
 		}
-		else if (myState == StateEnum.GETTING_ICE_CREAM)
+		else if (CurrentState == StateEnum.PICKING_ICE_CREAM)
 		{
 			if (Me.CanUseTable(IceCream))
-				return $"USE {IceCream.Position}; {myState}";
+				return $"USE {IceCream.Position}; {CurrentState}";
 			else 
-				return $"MOVE {IceCream.Position}; {myState}";
+				return $"MOVE {IceCream.Position}; {CurrentState}";
 		}
-		else if (myState == StateEnum.GETTING_STRAWBERRIES)
+		else if (CurrentState == StateEnum.PICKING_STRAWBERRIES)
 		{
 			if (Me.CanUseTable(Strawberries))
-				return $"USE {Strawberries.Position}; {myState}";
+				return $"USE {Strawberries.Pistion}; {CurrentState}";
 			else 
-				return $"MOVE {Strawberries.Position}; {myState}";
+				return $"MOVE {Strawberries.Position}; {CurrentState}";
 		}
-		else if (myState == StateEnum.CHOPPING_STRAWBERRIES)
+		else if (CurrentState == StateEnum.CHOPPING_STRAWBERRIES)
 		{
 			if (Me.CanUseTable(ChoppingTable))
-				return $"USE {ChoppingTable.Position}; {myState}";
+				return $"USE {ChoppingTable.Position}; {CurrentState}";
 			else 
-				return $"MOVE {ChoppingTable.Position}; {myState}";
+				return $"MOVE {ChoppingTable.Position}; {CurrentState}";
 		}
-		else if (myState == StateEnum.LEAVING_CHOPPED_STRAWBERRIES)
+		else if (CurrentState == StateEnum.LEAVING_CHOPPED_STRAWBERRIES)
 		{
 			var nearestDishEmptyTable = Tables
 				.Where(o => o.Content == ItemEnum.EMPTY)
@@ -194,30 +200,30 @@ public class Game
 				.First();
 
 			if (Me.CanUseTable(nearestDishEmptyTable))
-				return $"USE {nearestDishEmptyTable.Position}; {myState}";
+				return $"USE {nearestDishEmptyTable.Position}; {CurrentState}";
 			else 
-				return $"MOVE {nearestDishEmptyTable.Position}; {myState}";
+				return $"MOVE {nearestDishEmptyTable.Position}; {CurrentState}";
 		}
-		else if (myState == StateEnum.GETTING_CHOPPED_STRAWBERRIES)
+		else if (CurrentState == StateEnum.GETTING_CHOPPED_STRAWBERRIES)
 		{
 			var tableWithChoppedStrawberries = Tables.FirstOrDefault(o => o.Content.HasFlag(ItemEnum.CHOPPED_STRAWBERRIES));
 			if (tableWithChoppedStrawberries != null)
 			{
 				if (Me.CanUseTable(tableWithChoppedStrawberries))
-					return $"USE {tableWithChoppedStrawberries.Position}; {myState}";
+					return $"USE {tableWithChoppedStrawberries.Position}; {CurrentState}";
 				else 
-					return $"MOVE {tableWithChoppedStrawberries.Position}; {myState}";
+					return $"MOVE {tableWithChoppedStrawberries.Position}; {CurrentState}";
 			}
 		}
-		else if (myState == StateEnum.DELIVERING)
+		else if (CurrentState == StateEnum.DELIVERING)
 		{
 			if (Me.CanUseTable(Window)) 
 			{
 				PreparingOrder = null;
-				return $"USE {Window.Position}; {myState}";
+				return $"USE {Window.Position}; {CurrentState}";
 			}
 			else
-				return $"MOVE {Window.Position}; {myState}";
+				return $"MOVE {Window.Position}; {CurrentState}";
 		}
 
 		return "WAIT";
@@ -225,28 +231,26 @@ public class Game
 
 	private void DefineStatesSequence() 
 	{
-		StatesSequence = new List<StateEnum>();
-		if (PreparingOrder.Order.HasFlag(ItemEnum.CHOPPED_STRAWBERRIES))
-		{
-			StatesSequence.Add(StateEnum.GETTING_STRAWBERRIES);
-			StatesSequence.Add(StateEnum.CHOPPING_STRAWBERRIES);
-			StatesSequence.Add(StateEnum.LEAVING_CHOPPED_STRAWBERRIES);
-			StatesSequence.Add(StateEnum.GETTING_DISH);
-			StatesSequence.Add(StateEnum.GETTING_CHOPPED_STRAWBERRIES);
-		} 
-		else
-		{
-			StatesSequence.Add(StateEnum.GETTING_CHOPPED_STRAWBERRIES);
-		}
+		// Defining equipments to use
+		var equipments = new List<string>() {"D", "W"};
+
+		if (PreparingOrder.Order.HasFlag(ItemEnum.BLUEBERRIES))
+			equipments.Add("B");
 
 		if (PreparingOrder.Order.HasFlag(ItemEnum.ICE_CREAM))
-			StatesSequence.Add(StateEnum.GETTING_ICE_CREAM);
-		
-		if (PreparingOrder.Order.HasFlag(ItemEnum.BLUEBERRIES))
-			StatesSequence.Add(StateEnum.GETTING_BLUEBERRIES);
-		
-		StatesSequence.Add(StateEnum.DELIVERING);
+			equipments.Add("I");
 
+		if (PreparingOrder.Order.HasFlag(ItemEnum.CHOPPED_STRAWBERRIES))
+		{
+			equipments.Add("S");
+			equipments.Add("C");
+		}
+
+		if (PreparingOrder.Order.HasFlag(ItemEnum.CROISSANT))
+		{
+			equipments.Add("H");
+			equipments.Add("O");
+		}
 	}
 
 	private void PickClientOrder() 
@@ -264,15 +268,6 @@ public class Game
 			Console.Error.WriteLine(string.Join(" - ", StatesSequence.ToArray()));
 		}
 
-		var myState = StatesSequence[MyStateIndex];
-
-		if (myState == StateEnum.GETTING_STRAWBERRIES && Me.Items.HasFlag(ItemEnum.STRAWBERRIES)) MyStateIndex++;
-		else if (myState == StateEnum.CHOPPING_STRAWBERRIES && Me.Items.HasFlag(ItemEnum.CHOPPED_STRAWBERRIES)) MyStateIndex++;
-		else if (myState == StateEnum.LEAVING_CHOPPED_STRAWBERRIES && !Me.Items.HasFlag(ItemEnum.CHOPPED_STRAWBERRIES)) MyStateIndex++;
-		else if (myState == StateEnum.GETTING_CHOPPED_STRAWBERRIES && Me.Items.HasFlag(ItemEnum.CHOPPED_STRAWBERRIES)) MyStateIndex++;
-		else if (myState == StateEnum.GETTING_DISH && Me.Items.HasFlag(ItemEnum.DISH)) MyStateIndex++;
-		else if (myState == StateEnum.GETTING_BLUEBERRIES && Me.Items.HasFlag(ItemEnum.BLUEBERRIES)) MyStateIndex++;
-		else if (myState == StateEnum.GETTING_ICE_CREAM && Me.Items.HasFlag(ItemEnum.ICE_CREAM)) MyStateIndex++;
 	}
 } 
 
@@ -301,6 +296,8 @@ public class CodeALaMode
                 if (kitchenLine[j] == 'B') game.Blueberry = new Table { Position = new Position { X = j, Y = i} };
                 if (kitchenLine[j] == 'S') game.Strawberries = new Table { Position = new Position { X = j, Y = i} };
                 if (kitchenLine[j] == 'C') game.ChoppingTable = new Table { Position = new Position { X = j, Y = i} };
+                if (kitchenLine[j] == 'H') game.Dough = new Table { Position = new Position { X = j, Y = i} };
+                if (kitchenLine[j] == 'O') game.Oven = new Table { Position = new Position { X = j, Y = i} };
                 if (kitchenLine[j] == '#') game.Tables.Add(new Table { Position = new Position { X = j, Y = i} });
             }
         }
