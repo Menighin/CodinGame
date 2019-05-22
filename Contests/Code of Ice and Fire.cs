@@ -13,6 +13,26 @@ public class Position
 	public int ManhattanDistance(Position p2) => Math.Abs(X - p2.X) + Math.Abs(Y - p2.Y);
 
 	public override string ToString() => $"{X} {Y}";
+
+    public override bool Equals(object value)
+    {
+        var position = value as Position;
+
+        return position != null
+            && position.X == X
+            && position.Y == Y;
+    }
+
+    public override int GetHashCode()
+    {
+        unchecked
+        {
+            int hash = 13;
+            hash = (hash * 17) + X.GetHashCode();
+            hash = (hash * 17) + Y.GetHashCode();
+            return hash;
+        }
+    }
 }
 
 public class Unit
@@ -46,6 +66,102 @@ public class Game
     public char[,] Map { get; set; } = new char[12, 12];
     public Player Me { get; set; } = new Player();
     public Player Opponent { get; set; } = new Player();
+
+
+    public List<string> GetCommands()
+    {
+        // PrintMap();
+        var commands = new List<string>();
+        SpawnUnits(commands);
+        MoveUnits(commands);
+        return commands;
+    }
+
+    private Dictionary<Position, int> CalculateValueMapFor(Position position)
+    {
+        var mapValue = new Dictionary<Position, int>();
+
+        for (int i = 0; i < Map.GetLength(0); i++)
+        {
+            for (int j = 0; j < Map.GetLength(1); j++)
+            {
+                var cell = Map[i, j];
+                var cellPosition = new Position { X = j, Y = i };
+
+                switch(cell)
+                {
+                    case '#':
+                        mapValue[cellPosition] = 0;
+                        break;
+                    case '.':
+                        mapValue[cellPosition] = 1000 - position.ManhattanDistance(cellPosition);
+                        break;
+                    case 'o':
+                    case 'O':
+                        mapValue[cellPosition] = 1;
+                        break;
+                    case 'x':
+                    case 'X':
+                        mapValue[cellPosition] = 1000 - position.ManhattanDistance(cellPosition) + 10;
+                        break;
+                }
+            }
+        }
+        return mapValue;
+    }
+
+    private void SpawnUnits(List<string> commands)
+    {
+        var mapValue = CalculateValueMapFor(Me.Buildings.First(o => o.BuildingType == BuildingType.Hq).Position);
+        if (Me.Gold > 10)
+        {
+            var highestValue = mapValue.OrderByDescending(o => o.Value).First();
+            commands.Add($"TRAIN 1 {highestValue.Key.X} {highestValue.Key.Y}");
+        }
+    }
+
+    private void MoveUnits(List<string> commands)
+    {
+        var usedPosition = new HashSet<Position>();
+        foreach (var u in Me.Units)
+        {
+            var mapValue = CalculateValueMapFor(u.Position);
+
+            // PrintMapValue($"Unit {u.UnitId}", mapValue);
+
+            var highestValue = mapValue.OrderByDescending(o => o.Value).First();
+            commands.Add($"MOVE {u.UnitId} {highestValue.Key.X} {highestValue.Key.Y}");
+        }
+    }
+
+    private void PrintMapValue(string id, Dictionary<Position, int> mapValue)
+    {
+        Console.Error.WriteLine($"\nMAP OF {id} - {mapValue.Values.Count}");
+        var listMapValue = mapValue.Values.ToList();
+        for (int i = 0, k = 0; i < 12; i++)
+        {
+            var line = "";
+            for (var j = 0; j < 12; j++, k++)
+            {
+                line += $"{listMapValue[k]}".PadLeft(5) + " ";
+            }
+            Console.Error.WriteLine(line);
+        }
+    }
+
+    private void PrintMap()
+    {
+        Console.Error.WriteLine($"\nMAP");
+        for (int i = 0; i < Map.GetLength(0); i++)
+        {
+            var line = "";
+            for (int j = 0; j < Map.GetLength(1); j++)
+            {
+                line += $"{Map[i, j]}".PadLeft(5) + " ";
+            }
+            Console.Error.WriteLine(line);
+        }
+    }
 }
 
 public class CodeOfIceAndFire
@@ -119,10 +235,10 @@ public class CodeOfIceAndFire
             }
             #endregion
 
-            // Write an action using Console.WriteLine()
-            // To debug: Console.Error.WriteLine("Debug messages...");
 
-            Console.WriteLine("WAIT");
+            var commands = turn.GetCommands();
+            commands.Add("MSG Boi, that was a bad ending...");
+            Console.WriteLine(string.Join("; ", commands));
         }
     }
 }
