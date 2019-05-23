@@ -12,15 +12,18 @@ public class Position
 
 	public int ManhattanDistance(Position p2) => Math.Abs(X - p2.X) + Math.Abs(Y - p2.Y);
 
-	public override string ToString() => $"{X} {Y}";
+	public override string ToString() => $"({X}, {Y})";
 
-    public override bool Equals(object value)
+    public static bool operator ==(Position obj1, Position obj2) => obj1?.Equals(obj2) ?? ReferenceEquals(obj2, null);
+
+    public static bool operator !=(Position obj1, Position obj2) => !(obj1 == obj2);
+
+    public override bool Equals(object obj) => Equals((Position) obj);
+
+    protected bool Equals(Position other)
     {
-        var position = value as Position;
-
-        return position != null
-            && position.X == X
-            && position.Y == Y;
+        if (other == null) return false;
+        return X == other.X && Y == other.Y;
     }
 
     public override int GetHashCode()
@@ -102,7 +105,7 @@ public class Game
                         break;
                     case 'x':
                     case 'X':
-                        mapValue[cellPosition] = 1000 - position.ManhattanDistance(cellPosition) + 10;
+                        mapValue[cellPosition] = 1000 - position.ManhattanDistance(cellPosition);
                         break;
                 }
             }
@@ -110,13 +113,70 @@ public class Game
         return mapValue;
     }
 
+    private HashSet<Position> GetPossibleSpawnPositions() 
+    {
+        var result = new HashSet<Position>();
+
+        for (int i = 0; i < Map.GetLength(0); i++)
+        for (int j = 0; j < Map.GetLength(1); j++)
+        {
+            var cell = Map[i, j];
+            if (cell == 'o' || cell == 'O')
+            {
+                result.Add(new Position {X = j, Y = i});
+
+                var neighbors = new List<(char? Cell, Position Pos)>();
+                neighbors.Add((i > 0 ? Map[i - 1, j] : (char?) null, new Position { X = j, Y = i - 1 } ));
+                neighbors.Add((j > 0 ? Map[i, j - 1] : (char?) null, new Position { X = j - 1, Y = i } ));
+                neighbors.Add((i < Map.GetLength(0) - 1 ? Map[i + 1, j] : (char?) null, new Position { X = j, Y = i + 1 } ));
+                neighbors.Add((j < Map.GetLength(1) - 1 ? Map[i, j + 1] : (char?) null, new Position { X = j + 1, Y = i } ));
+
+                foreach (var n in neighbors)
+                {
+                    if (n.Cell != null && n.Cell != '#')
+                        result.Add(n.Pos);
+                }
+            }
+        }
+
+        return result;
+    }
+
     private void SpawnUnits(List<string> commands)
     {
         var mapValue = CalculateValueMapFor(Me.Buildings.First(o => o.BuildingType == BuildingType.Hq).Position);
-        if (Me.Gold > 10)
+
+        var canSpawnPositions = GetPossibleSpawnPositions();
+
+        var enemiesToDefeat = canSpawnPositions.Intersect(Opponent.Units.Select(o => o.Position)).ToHashSet();
+
+        if (enemiesToDefeat.Count > 0) 
         {
-            var highestValue = mapValue.OrderByDescending(o => o.Value).First();
-            commands.Add($"TRAIN 1 {highestValue.Key.X} {highestValue.Key.Y}");
+            foreach (var enemyPos in enemiesToDefeat)
+            {
+                var enemyAtPos = Opponent.Units.First(o => o.Position == enemyPos);
+                if (enemyAtPos.Level == 1)
+                {
+                    commands.Add($"TRAIN 2 {enemyPos.X} {enemyPos.Y}");
+                    Me.Gold -= 20;
+                }
+                else 
+                {
+                    commands.Add($"TRAIN 3 {enemyPos.X} {enemyPos.Y}");
+                    Me.Gold -= 30;
+                }
+
+                if (Me.Gold < 20) break;
+            }
+        }
+        else if (Me.Gold > 10)
+        {
+            var occupiedPositions = Me.Units.Select(o => o.Position).ToHashSet();
+
+            var highestAvailableValue = mapValue
+                .OrderByDescending(o => o.Value)
+                .First(o => !occupiedPositions.Contains(o.Key));
+            commands.Add($"TRAIN 1 {highestAvailableValue.Key.X} {highestAvailableValue.Key.Y}");
         }
     }
 
@@ -129,8 +189,13 @@ public class Game
 
             // PrintMapValue($"Unit {u.UnitId}", mapValue);
 
-            var highestValue = mapValue.OrderByDescending(o => o.Value).First();
-            commands.Add($"MOVE {u.UnitId} {highestValue.Key.X} {highestValue.Key.Y}");
+            var occupiedPositions = Me.Units.Select(o => o.Position).ToHashSet();
+
+            var highestAvailableValue = mapValue
+                .OrderByDescending(o => o.Value)
+                .First(o => !occupiedPositions.Contains(o.Key));
+
+            commands.Add($"MOVE {u.UnitId} {highestAvailableValue.Key.X} {highestAvailableValue.Key.Y}");
         }
     }
 
